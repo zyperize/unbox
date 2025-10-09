@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>File Manager</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#3b3b3b",
+            "background-light": "#FFF8E1",
+            "background-dark": "#1a1a1a",
+            "red-pastel": "#E57373",
+            "green-pastel": "#81C784",
+            "yellow-pastel": "#FFD54F"
+          },
+          fontFamily: {
+            display: ["Roboto Mono", "monospace"],
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+          },
+        },
+      },
+    };
+  </script>
+<style type="text/tailwindcss">
+    body {
+      font-family: 'Roboto Mono',
+      monospace;
+    }
+    :root {
+      --red-pastel-custom: #E57373;
+    }
+  </style>
+<style>
+    body {
+      font-family: 'Roboto Mono',
+      monospace;
+    }
+    .bg-red-pastel {
+      background-color: #E66767;
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-300 font-display">
+<div class="min-h-screen flex flex-col p-2 sm:p-4">
+<header class="mb-2 sm:mb-4">
+<p class="text-xs sm:text-sm"><span class="text-gray-500">C:</span> &gt; USERS &gt; ADMIN</p>
+</header>
+<main class="flex-grow grid grid-cols-1 lg:grid-cols-5 gap-2 sm:gap-4">
+<div class="lg:col-span-1 bg-white dark:bg-gray-800 border-2 border-gray-800 dark:border-gray-500 p-2 sm:p-4 rounded flex flex-col">
+<h2 class="text-base sm:text-lg font-bold mb-2 sm:mb-4">FOLDERS</h2>
+<div class="space-y-2 flex-grow">
+<div class="flex items-center p-2 border-2 border-gray-800 dark:border-gray-500 rounded bg-gray-100 dark:bg-gray-700">
+<span class="material-icons mr-2 text-base sm:text-xl">folder</span>
+<div class="flex-grow">
+<p class="font-semibold text-xs sm:text-sm">HOME</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">120 GB</p>
+</div>
+</div>
+<div>
+<div class="flex items-center p-2 border-2 border-gray-800 dark:border-gray-500 rounded bg-yellow-100 dark:bg-yellow-900/30">
+<span class="material-icons mr-2 text-base sm:text-xl">folder_open</span>
+<div class="flex-grow">
+<p class="font-semibold text-xs sm:text-sm">DOCUMENTS</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">80 GB</p>
+</div>
+<span class="material-icons text-base sm:text-xl">arrow_drop_down</span>
+</div>
+<div class="ml-4 mt-1 space-y-1 border-l-2 border-gray-300 dark:border-gray-600 pl-2">
+<div class="flex items-center text-xs sm:text-sm">
+<div class="w-3 h-3 bg-red-pastel border border-gray-800 dark:border-gray-500 rounded-sm mr-2 flex-shrink-0"></div>
+<div class="flex-grow flex justify-between items-center min-w-0">
+<span class="truncate">annual_financial_report_final_version.pdf</span>
+<span class="text-gray-500 dark:text-gray-400 w-20 text-right flex-shrink-0">1.2 GB</span>
+</div>
+</div>
+<div class="flex items-center text-xs sm:text-sm">
+<div class="w-3 h-3 bg-red-pastel border border-gray-800 dark:border-gray-500 rounded-sm mr-2 flex-shrink-0"></div>
+<div class="flex-grow flex justify-between items-center min-w-0">
+<span class="truncate">archived_data.zip</span>
+<span class="text-gray-500 dark:text-gray-400 w-20 text-right flex-shrink-0">2.5 GB</span>
+</div>
+</div>
+<div class="flex items-center text-xs sm:text-sm">
+<div class="w-3 h-3 bg-yellow-pastel border border-gray-800 dark:border-gray-500 rounded-sm mr-2 grid grid-cols-2 grid-rows-2 gap-px p-px flex-shrink-0">
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full"></div>
+</div>
+<div class="flex-grow flex justify-between items-center min-w-0">
+<span class="truncate">very_long_filename_for_data_analysis.xlsx</span>
+<span class="text-gray-500 dark:text-gray-400 w-20 text-right flex-shrink-0">750 MB</span>
+</div>
+</div>
+<div class="flex items-center text-xs sm:text-sm">
+<div class="w-3 h-3 bg-yellow-pastel border border-gray-800 dark:border-gray-500 rounded-sm mr-2 grid grid-cols-2 grid-rows-2 gap-px p-px flex-shrink-0">
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full"></div>
+</div>
+<div class="flex-grow flex justify-between items-center min-w-0">
+<span class="truncate">customer_data.csv</span>
+<span class="text-gray-500 dark:text-gray-400 w-20 text-right flex-shrink-0">150 MB</span>
+</div>
+</div>
+<div class="flex items-center text-xs sm:text-sm">
+<div class="w-3 h-3 bg-green-pastel border border-gray-800 dark:border-gray-500 rounded-sm mr-2 grid grid-cols-2 gap-px p-px flex-shrink-0">
+<div class="w-full h-full bg-green-300 dark:bg-green-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+</div>
+<div class="flex-grow flex justify-between items-center min-w-0">
+<span class="truncate">quarterly_results_presentation.pptx</span>
+<span class="text-gray-500 dark:text-gray-400 w-20 text-right flex-shrink-0">50 MB</span>
+</div>
+</div>
+<div class="flex items-center text-xs sm:text-sm">
+<div class="w-3 h-3 bg-green-pastel border border-gray-800 dark:border-gray-500 rounded-sm mr-2 grid grid-cols-2 gap-px p-px flex-shrink-0">
+<div class="w-full h-full bg-green-300 dark:bg-green-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+</div>
+<div class="flex-grow flex justify-between items-center min-w-0">
+<span class="truncate">meeting_notes.docx</span>
+<span class="text-gray-500 dark:text-gray-400 w-20 text-right flex-shrink-0">2 MB</span>
+</div>
+</div>
+<div class="flex items-center text-xs sm:text-sm">
+<div class="w-3 h-3 bg-green-pastel border border-gray-800 dark:border-gray-500 rounded-sm mr-2 grid grid-cols-2 gap-px p-px flex-shrink-0">
+<div class="w-full h-full bg-green-300 dark:bg-green-800 border-l border-t border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+</div>
+<div class="flex-grow flex justify-between items-center min-w-0">
+<span class="truncate">analysis_script.py</span>
+<span class="text-gray-500 dark:text-gray-400 w-20 text-right flex-shrink-0">50 KB</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center p-2 border-2 border-gray-800 dark:border-gray-500 rounded bg-gray-100 dark:bg-gray-700">
+<span class="material-icons mr-2 text-base sm:text-xl">folder</span>
+<div class="flex-grow">
+<p class="font-semibold text-xs sm:text-sm">PROJECTS</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">50 GB</p>
+</div>
+</div>
+<div class="flex items-center p-2 border-2 border-gray-800 dark:border-gray-500 rounded bg-gray-100 dark:bg-gray-700">
+<span class="material-icons mr-2 text-base sm:text-xl">folder</span>
+<div class="flex-grow">
+<p class="font-semibold text-xs sm:text-sm">DOWNLOADS</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">30 GB</p>
+</div>
+</div>
+</div>
+</div>
+<div class="lg:col-span-4 bg-white dark:bg-gray-800 border-2 border-gray-800 dark:border-gray-500 p-2 sm:p-4 rounded flex flex-col">
+<div class="flex justify-between items-center mb-2 sm:mb-4">
+<h2 class="text-base sm:text-lg font-bold">FILE VISUALIZATION</h2>
+<div class="flex items-center space-x-2 sm:space-x-4 text-xs sm:text-sm">
+<div class="flex items-center">
+<div class="w-4 h-4 sm:w-5 sm:h-5 bg-red-pastel border-2 border-gray-800 dark:border-gray-500 rounded mr-1.5 sm:mr-2"></div>
+<span>Large (&gt;1GB)</span>
+</div>
+<div class="flex items-center">
+<div class="w-4 h-4 sm:w-5 sm:h-5 grid grid-cols-2 grid-rows-2 gap-px p-px bg-yellow-pastel border-2 border-gray-800 dark:border-gray-500 rounded mr-1.5 sm:mr-2">
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full"></div>
+</div>
+<span>Medium (100MB-1GB)</span>
+</div>
+<div class="flex items-center">
+<div class="w-4 h-4 sm:w-5 sm:h-5 bg-green-pastel border-2 border-gray-800 dark:border-gray-500 rounded mr-1.5 sm:mr-2 grid grid-cols-2 gap-px p-px">
+<div class="w-full h-full bg-green-300 dark:bg-green-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+<div class="w-full h-full"></div>
+</div>
+<span>Small (&lt;100MB)</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-4 grid-rows-2 gap-1 sm:gap-2 flex-grow">
+<div class="col-span-2 row-span-2 bg-red-pastel border-2 border-gray-800 dark:border-gray-500 rounded p-0.5 sm:p-1">
+<div class="w-full h-full border-2 border-gray-800 dark:border-gray-500 bg-red-300 dark:bg-red-800/50"></div>
+</div>
+<div class="col-span-1 row-span-1 bg-yellow-pastel border-2 border-gray-800 dark:border-gray-500 rounded grid grid-cols-2 grid-rows-2 gap-0.5 p-0.5">
+<div class="bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class=""></div>
+</div>
+<div class="col-span-1 row-span-1 bg-green-pastel border-2 border-gray-800 dark:border-gray-500 rounded grid grid-cols-4 gap-0.5 p-0.5">
+<div class="bg-green-300 dark:bg-green-800 border border-gray-800 dark:border-gray-500"></div>
+<div class=""></div>
+<div class=""></div>
+<div class=""></div>
+<div class=""></div>
+<div class=""></div>
+<div class=""></div>
+<div class=""></div>
+<div class=""></div>
+<div class=""></div>
+</div>
+<div class="col-span-2 row-span-1 bg-yellow-pastel border-2 border-gray-800 dark:border-gray-500 rounded grid grid-cols-2 grid-rows-2 gap-0.5 p-0.5">
+<div class="bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class="bg-yellow-300 dark:bg-yellow-800 border border-gray-800 dark:border-gray-500"></div>
+<div class=""></div>
+</div>
+</div>
+</div>
+</main>
+<footer class="mt-2 sm:mt-4 bg-primary text-white p-2 rounded">
+<p class="text-xs sm:text-sm text-center">TOTAL SIZE: 320 GB | FILES: 12,345 | LAST SCAN: 2024-07-26 10:00 AM</p>
+</footer>
+</div>
+
+</body></html>

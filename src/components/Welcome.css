@@ -1,0 +1,182 @@
+.welcome-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: #FFF8E1;
+  position: relative;
+}
+
+.drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  z-index: 1000;
+  user-select: none;
+}
+
+.drag-spacer {
+  flex: 1;
+}
+
+/* Neo-brutalist Window Container */
+.neobrutalist-window {
+  max-width: 500px;
+  width: 100%;
+  background: #FAF9F6;
+  border: 2px solid #3b3b3b;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* Window Header */
+.window-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-bottom: 2px solid #3b3b3b;
+  background: var(--gray-800);
+  border-radius: 6px 6px 0 0;
+}
+
+.window-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* Main Content */
+.window-content {
+  padding: 32px;
+  background: #FAF9F6;
+}
+
+.welcome-main {
+  text-align: center;
+}
+
+.main-title {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--gray-800);
+  margin: 0 0 8px 0;
+}
+
+.main-subtitle {
+  font-size: 16px;
+  color: #6b7280;
+  margin: 0 0 40px 0;
+}
+
+/* Drive Selector Section */
+.drive-selector-section {
+  margin-bottom: 32px;
+  text-align: left;
+}
+
+.drive-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  color: #3b3b3b;
+  margin-bottom: 12px;
+}
+
+.select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.drive-select {
+  width: 100%;
+  appearance: none;
+  background: #FAF9F6;
+  border: 2px solid #3b3b3b;
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 16px;
+  color: #3b3b3b;
+  cursor: pointer;
+  box-shadow: 4px 4px 0px #000;
+  transition: all 0.2s ease;
+}
+
+.drive-select:focus {
+  outline: none;
+  border-color: var(--gray-800);
+  box-shadow: 0 0 0 3px rgba(59, 59, 59, 0.1), 4px 4px 0px #000;
+}
+
+.drive-select:hover {
+  background: var(--yellow-pastel);
+}
+
+.select-arrow {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #3b3b3b;
+}
+
+.arrow-icon {
+  font-size: 20px;
+}
+
+/* Run Button */
+.run-button {
+  width: 100%;
+  padding: 16px 24px;
+  background: var(--gray-800);
+  border: 2px solid #3b3b3b;
+  border-radius: 6px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  box-shadow: 4px 4px 0px #000;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.run-button:hover {
+  background: var(--green-pastel);
+  color: var(--gray-800);
+  box-shadow: 4px 4px 0px #000;
+}
+
+.run-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px #000;
+}
+
+/* Window Footer */
+.window-footer {
+  border-top: 2px solid #3b3b3b;
+  padding: 12px;
+  text-align: center;
+  background: #FAF9F6;
+  border-radius: 0 0 6px 6px;
+}
+
+.version-text {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}

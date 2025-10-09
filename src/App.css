@@ -1,0 +1,88 @@
+:root {
+  --primary: #3b3b3b;
+  --background-light: #FFF8E1;
+  --white: #ffffff;
+  --gray-800: #1f2937;
+  --gray-700: #374151;
+  --gray-500: #6b7280;
+  --gray-400: #9ca3af;
+  --gray-100: #f3f4f6;
+  --red-pastel: #E57373;
+  --green-pastel: #81C784;
+  --yellow-pastel: #FFD54F;
+  --border-width: 2px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Roboto Mono', monospace;
+  background: var(--background-light);
+  color: var(--gray-800);
+  overflow: hidden;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+button {
+  font-family: 'Roboto Mono', monospace;
+  cursor: pointer;
+  user-select: none;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--charcoal);
+  color: var(--white);
+  border: var(--border-width) solid var(--charcoal);
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 150ms ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+  color: var(--charcoal);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--charcoal);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--charcoal);
+  border: var(--border-width) solid var(--charcoal);
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 150ms ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--charcoal);
+  color: var(--white);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--accent-green);
+}
+
+/* Enable dragging for Tauri windows */
+*[data-tauri-drag-region] {
+  app-region: drag;
+}
