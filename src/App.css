@@ -781,7 +781,7 @@ body {
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 0.6em;
+  gap: 8px;
   line-height: 1;
   overflow: hidden;
   min-width: 0;
@@ -805,8 +805,8 @@ body {
   color: #f98006;
   flex-shrink: 0;
   filter: drop-shadow(2px 2px 0 #1c140d);
-  width: 1.125em;
-  height: 1.125em;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
@@ -814,8 +814,8 @@ body {
   color: #8b5cf6;
   flex-shrink: 0;
   filter: drop-shadow(2px 2px 0 rgba(139, 92, 246, 0.4));
-  width: 1.125em;
-  height: 1.125em;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
@@ -823,8 +823,8 @@ body {
   color: #8b5cf6;
   flex-shrink: 0;
   filter: drop-shadow(2px 2px 0 #1c140d);
-  width: 1.125em;
-  height: 1.125em;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 
