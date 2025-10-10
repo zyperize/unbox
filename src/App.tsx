@@ -777,13 +777,21 @@ function App() {
                         // Load directory containing the ZIP file
                         await loadDirectory(dir);
 
-                        // Small delay to ensure state updates, then select the zip file
+                        // Small delay to ensure state updates, then select and scroll to the zip file
                         setTimeout(() => {
                           setTabs(prevTabs => prevTabs.map(tab =>
                             tab.id === activeTabId
                               ? { ...tab, selectedFiles: new Set([zip.path]) }
                               : tab
                           ));
+
+                          // Scroll to the selected file
+                          setTimeout(() => {
+                            const selectedRow = document.querySelector('.file-row.selected');
+                            if (selectedRow) {
+                              selectedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                          }, 150);
                         }, 100);
                       }}
                       onContextMenu={async (e) => {
