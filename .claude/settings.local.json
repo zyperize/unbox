@@ -29,7 +29,11 @@
       "Bash(findstr:*)",
       "Bash(cargo:*)",
       "Bash(git add:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(unzip:*)",
+      "Bash(npx --yes create-tauri-app@latest unbox-7zip --manager npm --template react-ts --yes)",
+      "Bash(git clone:*)",
+      "Bash(git remote add:*)"
     ],
     "deny": [],
     "ask": []
