@@ -14,8 +14,8 @@
     "windows": [
       {
         "title": "unbox",
-        "width": 500,
-        "height": 450,
+        "width": 1200,
+        "height": 800,
         "minWidth": 500,
         "minHeight": 450,
         "decorations": false,

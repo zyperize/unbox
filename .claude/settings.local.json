@@ -35,7 +35,8 @@
       "Bash(git clone:*)",
       "Bash(git remote add:*)",
       "Bash(git push:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

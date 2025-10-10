@@ -62,11 +62,16 @@ function App() {
   const [sortColumn, setSortColumn] = useState<'name' | 'size' | 'modified' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isMaximized, setIsMaximized] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(0.9);
   const [archiveSortBy, setArchiveSortBy] = useState<'date' | 'size'>('date');
   const [archiveSortDirection, setArchiveSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogMessage, setConfirmDialogMessage] = useState("");
+  const [confirmDialogCallback, setConfirmDialogCallback] = useState<(() => void) | null>(null);
+  const [showAlertDialog, setShowAlertDialog] = useState(false);
+  const [alertDialogMessage, setAlertDialogMessage] = useState("");
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -94,7 +99,7 @@ function App() {
         e.preventDefault();
         setZoomLevel(prev => {
           const delta = e.deltaY > 0 ? -0.05 : 0.05;
-          return Math.max(0.75, Math.min(1.5, prev + delta));
+          return Math.max(0.65, Math.min(1.35, prev + delta));
         });
       }
     };
@@ -128,6 +133,50 @@ function App() {
     document.addEventListener('mouseup', handleMouseButton);
     return () => document.removeEventListener('mouseup', handleMouseButton);
   }, [historyIndex, navigationHistory, activeTabId]);
+
+  useEffect(() => {
+    // Backspace key navigation to go back
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if backspace is pressed and not in an input/textarea
+      if (e.key === 'Backspace' &&
+          !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          const previousPath = navigationHistory[newIndex];
+          setHistoryIndex(newIndex);
+          loadDirectory(previousPath, activeTabId, false);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [historyIndex, navigationHistory, activeTabId]);
+
+  function showAlert(message: string) {
+    setAlertDialogMessage(message);
+    setShowAlertDialog(true);
+  }
+
+  function showConfirm(message: string, callback: () => void) {
+    setConfirmDialogMessage(message);
+    setConfirmDialogCallback(() => callback);
+    setShowConfirmDialog(true);
+  }
+
+  function handleConfirmYes() {
+    if (confirmDialogCallback) {
+      confirmDialogCallback();
+    }
+    setShowConfirmDialog(false);
+    setConfirmDialogCallback(null);
+  }
+
+  function handleConfirmNo() {
+    setShowConfirmDialog(false);
+    setConfirmDialogCallback(null);
+  }
 
   async function checkContextMenu() {
     // Try to register context menu on first run (requires admin)
@@ -324,7 +373,7 @@ function App() {
 
       loadDirectory(activeTab.path);
     } catch (error) {
-      alert(`Failed to paste: ${error}`);
+      showAlert(`Failed to paste: ${error}`);
     }
   }
 
@@ -332,17 +381,17 @@ function App() {
     const activeTab = tabs.find(t => t.id === activeTabId);
     if (!activeTab || activeTab.selectedFiles.size === 0) return;
 
-    if (!confirm(`Delete ${activeTab.selectedFiles.size} file(s)?`)) return;
+    showConfirm(`Delete ${activeTab.selectedFiles.size} file(s)?`, async () => {
+      try {
+        for (const filePath of activeTab.selectedFiles) {
+          await invoke("delete_file", { filePath });
+        }
 
-    try {
-      for (const filePath of activeTab.selectedFiles) {
-        await invoke("delete_file", { filePath });
+        loadDirectory(activeTab.path);
+      } catch (error) {
+        showAlert(`Failed to delete: ${error}`);
       }
-
-      loadDirectory(activeTab.path);
-    } catch (error) {
-      alert(`Failed to delete: ${error}`);
-    }
+    });
   }
 
   function handleSort(column: 'name' | 'size' | 'modified') {
@@ -439,7 +488,7 @@ function App() {
         archivePath: extractingFile.path,
         destinationPath: archiveDir
       });
-      alert("Archive extracted successfully!");
+      showAlert("Archive extracted successfully!");
       setShowExtractOptions(false);
       setExtractingFile(null);
 
@@ -451,7 +500,7 @@ function App() {
       const recent = await invoke<RecentZipFile[]>("get_recent_zip_files");
       setRecentZips(recent);
     } catch (error) {
-      alert(`Failed to extract: ${error}`);
+      showAlert(`Failed to extract: ${error}`);
     }
   }
 
@@ -472,7 +521,7 @@ function App() {
         archivePath: extractingFile.path,
         destinationPath: extractPath
       });
-      alert("Archive extracted successfully!");
+      showAlert("Archive extracted successfully!");
       setShowExtractDialog(false);
       setExtractingFile(null);
 
@@ -484,7 +533,7 @@ function App() {
       const recent = await invoke<RecentZipFile[]>("get_recent_zip_files");
       setRecentZips(recent);
     } catch (error) {
-      alert(`Failed to extract: ${error}`);
+      showAlert(`Failed to extract: ${error}`);
     }
   }
 
@@ -553,7 +602,7 @@ function App() {
 
   async function handleCreateFolder() {
     if (!newFolderName.trim()) {
-      alert("Please enter a folder name");
+      showAlert("Please enter a folder name");
       return;
     }
 
@@ -570,7 +619,7 @@ function App() {
       setNewFolderName("");
       loadDirectory(activeTab.path);
     } catch (error) {
-      alert(`Failed to create folder: ${error}`);
+      showAlert(`Failed to create folder: ${error}`);
     }
   }
 
@@ -578,6 +627,15 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Diagonal Resize Handle */}
+      <div
+        className="resize-handle"
+        onMouseDown={async (e) => {
+          e.preventDefault();
+          await appWindow.startResizeDragging('bottom-right' as any);
+        }}
+      />
+
       {/* Custom Title Bar */}
       <div className="titlebar" data-tauri-drag-region>
         <div className="titlebar-title">
@@ -868,7 +926,29 @@ function App() {
           )}
 
           {/* File table */}
-          <h3 className="section-title">My Files</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="section-title">My Files</h3>
+            {zoomLevel !== 0.9 && (
+              <button
+                onClick={() => setZoomLevel(0.9)}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  background: 'transparent',
+                  border: '2px solid #1c140d',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  color: '#1c140d',
+                  opacity: 0.5,
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
+              >
+                {((zoomLevel / 0.9) * 100).toFixed(0)}%
+              </button>
+            )}
+          </div>
           <div className="table-container" ref={tableRef} style={{ fontSize: `${zoomLevel}rem` }}>
             <div className="table-wrapper">
               <table className="file-table">
@@ -922,7 +1002,7 @@ function App() {
                             <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Z" />
                           </svg>
                         ) : file.name.toLowerCase().endsWith('.zip') ? (
-                          <svg className="zip-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
+                          <svg className="zip-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
                             <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-48-80a8,8,0,0,1-8,8H136v8h8a8,8,0,0,1,0,16h-8v8a8,8,0,0,1-16,0v-8h-8a8,8,0,0,1,0-16h8v-8h-8a8,8,0,0,1,0-16h8v-8a8,8,0,0,1,16,0v8h8A8,8,0,0,1,152,136Z"/>
                           </svg>
                         ) : file.is_archive ? (
@@ -967,7 +1047,16 @@ function App() {
                 </svg>
               </button>
             </div>
-            <button className="extract-btn" onClick={() => {
+            <button
+              className={`extract-btn ${
+                activeTab && activeTab.selectedFiles.size === 1 && (() => {
+                  const selectedArray = Array.from(activeTab.selectedFiles);
+                  const selectedFile = activeTab.files.find(f => f.path === selectedArray[0]);
+                  if (selectedFile) return selectedFile.is_archive;
+                  return selectedArray[0] ? /\.(7z|zip|rar|tar|gz|bz2|xz)$/i.test(selectedArray[0]) : false;
+                })() ? 'active' : ''
+              }`}
+              onClick={() => {
               if (!activeTab) return;
               const selectedArray = Array.from(activeTab.selectedFiles);
 
@@ -1156,6 +1245,61 @@ function App() {
                 onClick={handleCreateFolder}
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Dialog */}
+      {showConfirmDialog && (
+        <div className="dialog-overlay">
+          <div className="dialog">
+            <div className="dialog-header">
+              <h2 className="dialog-title">Confirm</h2>
+            </div>
+            <div className="dialog-body">
+              <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1c140d' }}>
+                {confirmDialogMessage}
+              </p>
+            </div>
+            <div className="dialog-actions">
+              <button
+                className="dialog-btn dialog-btn-secondary"
+                onClick={handleConfirmNo}
+              >
+                No
+              </button>
+              <button
+                className="dialog-btn dialog-btn-primary"
+                onClick={handleConfirmYes}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Dialog */}
+      {showAlertDialog && (
+        <div className="dialog-overlay">
+          <div className="dialog">
+            <div className="dialog-header">
+              <h2 className="dialog-title">Message</h2>
+            </div>
+            <div className="dialog-body">
+              <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1c140d' }}>
+                {alertDialogMessage}
+              </p>
+            </div>
+            <div className="dialog-actions">
+              <button
+                className="dialog-btn dialog-btn-primary"
+                onClick={() => setShowAlertDialog(false)}
+                style={{ flex: 'none', minWidth: '150px' }}
+              >
+                OK
               </button>
             </div>
           </div>

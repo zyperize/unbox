@@ -18,6 +18,56 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  position: relative;
+}
+
+/* Diagonal Resize Handle */
+.resize-handle {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  background-color: #f98006;
+  border-left: 4px solid #1c140d;
+  border-top: 4px solid #1c140d;
+  cursor: nwse-resize;
+  z-index: 9999;
+  transition: all 0.1s;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 12px;
+  height: 2px;
+  background-color: #1c140d;
+  transform: rotate(-45deg);
+  transform-origin: bottom right;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 8px;
+  height: 2px;
+  background-color: #1c140d;
+  transform: rotate(-45deg);
+  transform-origin: bottom right;
+}
+
+.resize-handle:hover {
+  background-color: #e07305;
+  transform: scale(1.1);
+}
+
+.resize-handle:active {
+  background-color: #1c140d;
 }
 
 /* Custom Title Bar - Neobrutalism */
@@ -607,9 +657,9 @@ body {
 .table-wrapper {
   border: 5px solid #1c140d;
   border-radius: 0;
-  overflow: hidden;
   background-color: #fcfaf8;
   height: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
   box-shadow: 6px 6px 0 0 #1c140d;
   position: relative;
@@ -652,7 +702,7 @@ body {
 
 .file-table th {
   text-align: left;
-  padding: 1em 1em;
+  padding: 0.6em 1em;
   font-size: 0.875em;
   font-weight: 900;
   color: #1c140d;
@@ -700,42 +750,15 @@ body {
 }
 
 .file-table tbody tr {
-  border-bottom: 4px solid #1c140d; /* Much thicker borders between files */
+  border-bottom: 3px solid #1c140d;
   transition: all 0.1s;
   cursor: pointer;
 }
 
 .file-table tbody tr:hover {
   background-color: #f4ede6;
-  transform: scale(1.01);
 }
 
-.file-table tbody tr:has(.zip-file) {
-  background: linear-gradient(135deg, rgba(249, 128, 6, 0.15) 0%, rgba(249, 128, 6, 0.08) 100%);
-  border-left: 6px solid #f98006;
-}
-
-.file-table tbody tr:has(.zip-file):hover {
-  background: linear-gradient(135deg, rgba(249, 128, 6, 0.2) 0%, rgba(249, 128, 6, 0.1) 100%);
-  border-left: 8px solid #f98006;
-  transform: scale(1.02);
-}
-
-.file-table tbody tr:has(.zip-file):hover .zip-text {
-  color: #1c140d;
-  text-shadow: 1px 1px 0 rgba(249, 128, 6, 0.4);
-}
-
-.file-table tbody tr:has(.zip-file):hover .zip-icon {
-  color: #1c140d;
-  filter: drop-shadow(3px 3px 0 rgba(249, 128, 6, 0.5));
-}
-
-.file-table tbody tr:has(.zip-file):hover .zip-size,
-.file-table tbody tr:has(.zip-file):hover .zip-modified {
-  color: #1c140d !important;
-  text-shadow: 1px 1px 0 rgba(249, 128, 6, 0.3);
-}
 
 .file-table tbody tr.selected {
   background-color: #f98006;
@@ -745,10 +768,12 @@ body {
 }
 
 .file-table td {
-  padding: 1.25em 1em;
+  padding: 0.4em 1em;
   font-size: 0.9375em;
   vertical-align: middle;
   font-weight: 600;
+  line-height: 1.2;
+  height: 2em;
 }
 
 .file-name {
@@ -757,19 +782,23 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75em;
+  line-height: 1.2;
+  overflow: hidden;
+  min-width: 0;
 }
 
-.file-name.zip-file {
-  border-left: 4px solid #f98006;
-  padding-left: 0.5em;
+.file-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
+
 
 .zip-text {
-  color: #ea580c;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  text-shadow: 1px 1px 0 rgba(249, 128, 6, 0.3);
+  color: #8b5cf6;
+  font-weight: 700;
+  text-shadow: 1px 1px 0 rgba(139, 92, 246, 0.3);
 }
 
 .folder-icon {
@@ -778,26 +807,16 @@ body {
   filter: drop-shadow(2px 2px 0 #1c140d);
   width: 1.125em;
   height: 1.125em;
+  display: block;
 }
 
 .zip-icon {
-  color: #f98006;
+  color: #8b5cf6;
   flex-shrink: 0;
-  filter: drop-shadow(4px 4px 0 rgba(249, 128, 6, 0.4));
-  width: 1.5em;
-  height: 1.5em;
-  animation: pulse-zip 2s ease-in-out infinite;
-}
-
-@keyframes pulse-zip {
-  0%, 100% {
-    transform: scale(1);
-    filter: drop-shadow(4px 4px 0 rgba(249, 128, 6, 0.4));
-  }
-  50% {
-    transform: scale(1.05);
-    filter: drop-shadow(5px 5px 0 rgba(249, 128, 6, 0.6)) brightness(1.2);
-  }
+  filter: drop-shadow(2px 2px 0 rgba(139, 92, 246, 0.4));
+  width: 1.125em;
+  height: 1.125em;
+  display: block;
 }
 
 .archive-icon {
@@ -806,6 +825,7 @@ body {
   filter: drop-shadow(2px 2px 0 #1c140d);
   width: 1.125em;
   height: 1.125em;
+  display: block;
 }
 
 .file-size,
@@ -816,12 +836,8 @@ body {
 
 .zip-size,
 .zip-modified {
-  color: #ea580c !important;
-  font-weight: 900 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  text-shadow: 2px 2px 0 rgba(249, 128, 6, 0.3);
-  vertical-align: middle;
+  color: #8b5cf6 !important;
+  text-shadow: 1px 1px 0 rgba(139, 92, 246, 0.3);
 }
 
 /* Actions Styles - Neobrutalism */
@@ -875,7 +891,7 @@ body {
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem 2rem;
-  background-color: #f98006;
+  background-color: #fcfaf8;
   color: #1c140d;
   border: 4px solid #1c140d;
   border-radius: 0;
@@ -885,13 +901,31 @@ body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.1s;
+  transition: all 0.15s ease-out;
   box-shadow: 5px 5px 0 0 #1c140d;
+  position: relative;
+}
+
+.extract-btn:not(:disabled).active {
+  background-color: #f98006;
+  color: #1c140d;
+  animation: pulse-extract 1.5s ease-in-out infinite;
+  box-shadow: 7px 7px 0 0 #1c140d;
+  transform: translate(-2px, -2px);
+}
+
+@keyframes pulse-extract {
+  0%, 100% {
+    box-shadow: 7px 7px 0 0 #1c140d;
+  }
+  50% {
+    box-shadow: 9px 9px 0 0 #1c140d;
+  }
 }
 
 .extract-btn:hover:not(:disabled) {
-  background-color: #1c140d;
-  color: #f98006;
+  background-color: #f98006;
+  color: #1c140d;
   transform: translate(-2px, -2px);
   box-shadow: 7px 7px 0 0 #1c140d;
 }
