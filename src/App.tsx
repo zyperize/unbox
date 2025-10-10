@@ -957,7 +957,7 @@ function App() {
               </button>
             )}
           </div>
-          <div className="table-container" ref={tableRef} style={{ fontSize: `${zoomLevel}rem` }}>
+          <div className="table-container" ref={tableRef}>
             <div className="table-wrapper">
               <table className="file-table">
                 <thead>
