@@ -36,7 +36,8 @@
       "Bash(git remote add:*)",
       "Bash(git push:*)",
       "Bash(git commit:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Read(//c/Users/marcj/**)"
     ],
     "deny": [],
     "ask": []
