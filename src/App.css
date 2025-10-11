@@ -280,12 +280,12 @@ body {
   align-items: flex-start;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.65rem;
+  padding: 0.52rem;
   border: 3px solid #1c140d;
   background: #fcfaf8;
   color: #1c140d;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -323,8 +323,8 @@ body {
 .sidebar-item .icon {
   color: #f98006;
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   filter: drop-shadow(2px 2px 0 rgba(249, 128, 6, 0.4));
 }
 
@@ -358,7 +358,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-weight: 800;
   color: #1c140d;
 }
@@ -433,11 +433,11 @@ body {
 .archive-item-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.85rem;
+  gap: 0.16rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: #9e7347;
-  margin-top: 0.3rem;
+  margin-top: 0.24rem;
   text-align: left;
   align-items: flex-start;
 }
@@ -445,8 +445,7 @@ body {
 .archive-size {
   color: #f98006;
   font-weight: 900;
-  font-size: 0.95rem;
-  text-shadow: 1px 1px 0 rgba(249, 128, 6, 0.3);
+  font-size: 0.76rem;
   letter-spacing: 0.02em;
   text-align: left;
 }
@@ -454,7 +453,7 @@ body {
 .archive-date {
   color: #1c140d;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.64rem;
   text-align: left;
 }
 
@@ -650,8 +649,8 @@ body {
 .table-container {
   flex: 1;
   overflow: hidden;
-  padding: 0.75rem 0;
-  font-size: 1rem;
+  padding: 12px 0;
+  font-size: 16px;
 }
 
 .table-wrapper {
@@ -691,6 +690,7 @@ body {
 .file-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .file-table thead {
@@ -702,7 +702,7 @@ body {
 
 .file-table th {
   text-align: left;
-  padding: 0.4rem 1rem;
+  padding: 6px 16px;
   font-size: 13px;
   font-weight: 900;
   color: #1c140d;
@@ -768,12 +768,12 @@ body {
 }
 
 .file-table td {
-  padding: 0.2rem 1rem;
+  padding: 3px 16px;
   font-size: 14px;
   vertical-align: middle;
   font-weight: 600;
   line-height: 1;
-  height: 26px;
+  height: 29px;
 }
 
 .file-name {
@@ -798,7 +798,6 @@ body {
 .zip-text {
   color: #8b5cf6;
   font-weight: 700;
-  text-shadow: 1px 1px 0 rgba(139, 92, 246, 0.3);
 }
 
 .folder-icon {
@@ -837,7 +836,6 @@ body {
 .zip-size,
 .zip-modified {
   color: #8b5cf6 !important;
-  text-shadow: 1px 1px 0 rgba(139, 92, 246, 0.3);
 }
 
 /* Actions Styles - Neobrutalism */
@@ -1213,18 +1211,16 @@ body {
     flex-wrap: wrap;
   }
 
-  .th-size,
-  .th-modified {
-    display: none;
-  }
-
-  .file-size,
-  .file-modified {
-    display: none;
-  }
-
   .th-name {
-    width: 100%;
+    width: 50%;
+  }
+
+  .th-size {
+    width: 25%;
+  }
+
+  .th-modified {
+    width: 25%;
   }
 
   .action-buttons {
