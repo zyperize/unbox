@@ -38,7 +38,8 @@
       "Bash(git commit:*)",
       "Bash(powershell:*)",
       "Read(//c/Users/marcj/**)",
-      "Bash(npx @tauri-apps/cli icon:*)"
+      "Bash(npx @tauri-apps/cli icon:*)",
+      "Bash(npm run tauri:dev:*)"
     ],
     "deny": [],
     "ask": []
