@@ -1,12 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import type { MouseEvent as ReactMouseEvent, DragEvent as ReactDragEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 import { useSettings } from "./contexts/SettingsContext";
 import { SettingsDialog } from "./components/dialogs/SettingsDialog";
-import type { FileEntry, DirectoryContents, RecentZipFile, TabData, ContextMenu, ClipboardData } from "./types";
+import { FileTable } from "./components/files/FileTable";
+import { TitleBar } from "./components/layout/TitleBar";
+import { Sidebar } from "./components/layout/Sidebar";
+import type { FileEntry, DirectoryContents, RecentZipFile, TabData, ContextMenu, ClipboardData, SortColumn, SortDirection } from "./types";
 
 const appWindow = getCurrentWindow();
+const EMPTY_SELECTION = new Set<string>();
 
 function App() {
   const { settings, updateAppearance } = useSettings();
@@ -27,8 +32,8 @@ function App() {
   const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [sortColumn, setSortColumn] = useState<'name' | 'size' | 'modified' | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isMaximized, setIsMaximized] = useState(false);
   const [archiveSortBy, setArchiveSortBy] = useState<'date' | 'size'>('date');
   const [archiveSortDirection, setArchiveSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -48,6 +53,53 @@ function App() {
     (settings.appearance.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   const zoomLevel = settings.appearance.zoomLevel;
+
+  const handleSelectAll = useCallback(() => {
+    if (!activeTabId) return;
+
+    setTabs(prevTabs =>
+      prevTabs.map(tab => {
+        if (tab.id !== activeTabId) {
+          return tab;
+        }
+
+        const allPaths = new Set(tab.files.map(file => file.path));
+        const selectionUnchanged =
+          allPaths.size === tab.selectedFiles.size &&
+          Array.from(allPaths).every(path => tab.selectedFiles.has(path));
+
+        if (selectionUnchanged) {
+          return tab;
+        }
+
+        const lastPath = tab.files.length > 0 ? tab.files[tab.files.length - 1].path : null;
+
+        return {
+          ...tab,
+          selectedFiles: allPaths,
+          lastSelectedFile: lastPath
+        };
+      })
+    );
+  }, [activeTabId]);
+
+  const handleClearSelection = useCallback(() => {
+    if (!activeTabId) return;
+
+    setTabs(prevTabs =>
+      prevTabs.map(tab => {
+        if (tab.id !== activeTabId || tab.selectedFiles.size === 0) {
+          return tab;
+        }
+
+        return {
+          ...tab,
+          selectedFiles: new Set(),
+          lastSelectedFile: null
+        };
+      })
+    );
+  }, [activeTabId]);
 
   // Initialize default sort from settings on first mount
   useEffect(() => {
@@ -115,6 +167,30 @@ function App() {
     document.addEventListener('mouseup', handleMouseButton);
     return () => document.removeEventListener('mouseup', handleMouseButton);
   }, [historyIndex, navigationHistory, activeTabId]);
+
+  useEffect(() => {
+    const handleKeyboardShortcuts = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      )) {
+        return;
+      }
+
+      if ((event.key === 'a' || event.key === 'A') && event.ctrlKey) {
+        event.preventDefault();
+        handleSelectAll();
+      } else if (event.key === 'Escape') {
+        handleClearSelection();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboardShortcuts);
+    return () => window.removeEventListener('keydown', handleKeyboardShortcuts);
+  }, [handleSelectAll, handleClearSelection]);
 
   useEffect(() => {
     // Backspace key navigation to go back
@@ -237,7 +313,8 @@ function App() {
         path: homeDir,
         name: "Home",
         files: contents.files,
-        selectedFiles: new Set()
+        selectedFiles: new Set(),
+        lastSelectedFile: null
       };
       setTabs([newTab]);
       setActiveTabId(newTabId);
@@ -247,7 +324,7 @@ function App() {
     }
   }
 
-  async function loadDirectory(path: string, tabId?: string, addToHistory: boolean = true) {
+  const loadDirectory = useCallback(async (path: string, tabId?: string, addToHistory: boolean = true) => {
     try {
       const contents = await invoke<DirectoryContents>("get_directory_contents", { path });
 
@@ -273,17 +350,20 @@ function App() {
       });
       const targetTabId = tabId || activeTabId;
 
-      setTabs(tabs.map(tab =>
-        tab.id === targetTabId
-          ? {
-              ...tab,
-              path: contents.current_path,
-              name: path.split(/[/\\]/).pop() || "Home",
-              files,
-              selectedFiles: new Set()
-            }
-          : tab
-      ));
+      setTabs(prevTabs =>
+        prevTabs.map(tab =>
+          tab.id === targetTabId
+            ? {
+                ...tab,
+                path: contents.current_path,
+                name: path.split(/[/\\]/).pop() || "Home",
+                files,
+                selectedFiles: new Set(),
+                lastSelectedFile: null
+              }
+            : tab
+        )
+      );
 
       if (targetTabId === activeTabId) {
         setExtractPath(path);
@@ -300,7 +380,7 @@ function App() {
     } catch (error) {
       console.error("Failed to load directory:", error);
     }
-  }
+  }, [activeTabId, navigationHistory, historyIndex, settings.behavior.defaultSort, settings.behavior.defaultSortDirection, settings.behavior.showHiddenFiles, sortColumn, sortDirection]);
 
   function goBack() {
     if (historyIndex > 0) {
@@ -321,46 +401,95 @@ function App() {
   }
 
 
-  function handleFileDoubleClick(file: FileEntry) {
+  const handleFileDoubleClick = useCallback((file: FileEntry) => {
     if (file.is_directory) {
       loadDirectory(file.path);
     }
-  }
+  }, [loadDirectory]);
 
-  function handleFileRightClick(file: FileEntry, event: React.MouseEvent) {
+  const handleFileRightClick = useCallback((file: FileEntry, event: ReactMouseEvent<HTMLTableRowElement>) => {
     event.preventDefault();
     if (file.is_archive) {
       setContextMenu({
         x: event.clientX,
         y: event.clientY,
-        file
+        file,
       });
     }
-  }
+  }, []);
 
-  function handleFileSelect(filePath: string, event: React.MouseEvent) {
-    const activeTab = tabs.find(t => t.id === activeTabId);
-    if (!activeTab) return;
+  const handleFileSelect = useCallback((filePath: string, event: ReactMouseEvent<HTMLTableRowElement>) => {
+    const isToggle = event.ctrlKey || event.metaKey;
+    const isRange = event.shiftKey;
 
-    const newSelected = new Set(activeTab.selectedFiles);
+    setTabs(prevTabs => {
+      let updated = false;
 
-    if (event.ctrlKey) {
-      // Ctrl+Click: toggle selection
-      if (newSelected.has(filePath)) {
-        newSelected.delete(filePath);
-      } else {
-        newSelected.add(filePath);
-      }
-    } else {
-      // Regular click: select only this file
-      newSelected.clear();
-      newSelected.add(filePath);
-    }
+      const nextTabs = prevTabs.map(tab => {
+        if (tab.id !== activeTabId) {
+          return tab;
+        }
 
-    setTabs(tabs.map(tab =>
-      tab.id === activeTabId ? { ...tab, selectedFiles: newSelected } : tab
-    ));
-  }
+        updated = true;
+        const files = tab.files;
+        let newSelected = new Set(tab.selectedFiles);
+        let nextAnchor = tab.lastSelectedFile;
+        let selectionChanged = false;
+
+        if (isRange && files.length > 0) {
+          const existingSelection = tab.lastSelectedFile
+            ?? (tab.selectedFiles.size > 0 ? Array.from(tab.selectedFiles)[0] : null);
+          const anchorPath = existingSelection ?? filePath;
+
+          const startIndex = files.findIndex(f => f.path === anchorPath);
+          const endIndex = files.findIndex(f => f.path === filePath);
+
+          if (startIndex !== -1 && endIndex !== -1) {
+            const start = Math.min(startIndex, endIndex);
+            const end = Math.max(startIndex, endIndex);
+            newSelected = new Set();
+            for (let i = start; i <= end; i++) {
+              newSelected.add(files[i].path);
+            }
+            nextAnchor = anchorPath;
+            selectionChanged = true;
+          } else {
+            if (!newSelected.has(filePath) || newSelected.size !== 1) {
+              newSelected = new Set([filePath]);
+              selectionChanged = true;
+            }
+            nextAnchor = filePath;
+          }
+        } else if (isToggle) {
+          if (newSelected.has(filePath)) {
+            newSelected.delete(filePath);
+            selectionChanged = true;
+            if (nextAnchor === filePath) {
+              nextAnchor = null;
+            }
+          } else {
+            newSelected.add(filePath);
+            selectionChanged = true;
+            nextAnchor = filePath;
+          }
+        } else {
+          if (newSelected.size !== 1 || !newSelected.has(filePath)) {
+            newSelected = new Set([filePath]);
+            selectionChanged = true;
+          }
+          nextAnchor = filePath;
+        }
+
+        const anchorChanged = nextAnchor !== tab.lastSelectedFile;
+
+        return selectionChanged || anchorChanged
+          ? { ...tab, selectedFiles: newSelected, lastSelectedFile: nextAnchor ?? null }
+          : tab;
+      });
+
+      return updated ? nextTabs : prevTabs;
+    });
+  }, [activeTabId]);
 
   async function handleCopy() {
     const activeTab = tabs.find(t => t.id === activeTabId);
@@ -420,37 +549,40 @@ function App() {
     }
   }
 
-  function handleSort(column: 'name' | 'size' | 'modified') {
-    const activeTab = tabs.find(t => t.id === activeTabId);
-    if (!activeTab) return;
-
-    let newDirection: 'asc' | 'desc' = sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc';
+  const handleSort = useCallback((column: SortColumn) => {
+    const newDirection: SortDirection =
+      sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc';
 
     setSortColumn(column);
     setSortDirection(newDirection);
 
-    const sortedFiles = [...activeTab.files].sort((a, b) => {
-      // Always keep directories at the top
-      if (a.is_directory && !b.is_directory) return -1;
-      if (!a.is_directory && b.is_directory) return 1;
+    setTabs((prevTabs) =>
+      prevTabs.map((tab) => {
+        if (tab.id !== activeTabId) {
+          return tab;
+        }
 
-      let comparison = 0;
+        const sortedFiles = [...tab.files].sort((a, b) => {
+          if (a.is_directory && !b.is_directory) return -1;
+          if (!a.is_directory && b.is_directory) return 1;
 
-      if (column === 'name') {
-        comparison = a.name.localeCompare(b.name);
-      } else if (column === 'size') {
-        comparison = a.size - b.size;
-      } else if (column === 'modified') {
-        comparison = a.modified.localeCompare(b.modified);
-      }
+          let comparison = 0;
 
-      return newDirection === 'asc' ? comparison : -comparison;
-    });
+          if (column === 'name') {
+            comparison = a.name.localeCompare(b.name);
+          } else if (column === 'size') {
+            comparison = a.size - b.size;
+          } else {
+            comparison = a.modified.localeCompare(b.modified);
+          }
 
-    setTabs(tabs.map(tab =>
-      tab.id === activeTabId ? { ...tab, files: sortedFiles } : tab
-    ));
-  }
+          return newDirection === 'asc' ? comparison : -comparison;
+        });
+
+        return { ...tab, files: sortedFiles };
+      })
+    );
+  }, [activeTabId, sortColumn, sortDirection]);
 
   async function createNewTab() {
     const activeTab = tabs.find(t => t.id === activeTabId);
@@ -463,7 +595,8 @@ function App() {
       path: newPath,
       name: newPath.split(/[/\\]/).pop() || "Home",
       files: contents.files,
-      selectedFiles: new Set()
+      selectedFiles: new Set(),
+      lastSelectedFile: null
     };
 
     setTabs([...tabs, newTab]);
@@ -478,7 +611,7 @@ function App() {
     }
   }
 
-  function closeTab(tabId: string, event: React.MouseEvent) {
+  function closeTab(tabId: string, event: ReactMouseEvent) {
     event.stopPropagation();
     const newTabs = tabs.filter(t => t.id !== tabId);
     if (newTabs.length === 0) {
@@ -558,28 +691,117 @@ function App() {
     }
   }
 
-  function toggleFolder(folderId: string) {
-    const newExpanded = new Set(expandedFolders);
-    if (newExpanded.has(folderId)) {
-      newExpanded.delete(folderId);
-    } else {
-      newExpanded.add(folderId);
-    }
-    setExpandedFolders(newExpanded);
-  }
+  const toggleFolder = useCallback((folderId: string) => {
+    setExpandedFolders(prev => {
+      const updated = new Set(prev);
+      if (updated.has(folderId)) {
+        updated.delete(folderId);
+      } else {
+        updated.add(folderId);
+      }
+      return updated;
+    });
+  }, []);
 
-  function handleDragStart(file: FileEntry, tabId: string, e: React.DragEvent) {
+  const handleDragStart = useCallback((file: FileEntry, tabId: string, event: ReactDragEvent<HTMLElement>) => {
     setDraggedFile(file);
     setDraggedFromTab(tabId);
-    e.dataTransfer.effectAllowed = 'move';
-  }
+    event.dataTransfer.effectAllowed = 'move';
+  }, []);
 
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }
+  const handleDragOver = useCallback((event: ReactDragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
 
-  async function handleDropOnTab(targetTabId: string, e: React.DragEvent) {
+  const handleRowDragStart = useCallback(
+    (file: FileEntry, event: ReactDragEvent<HTMLElement>) => {
+      if (activeTabId) {
+        handleDragStart(file, activeTabId, event);
+      }
+    },
+    [handleDragStart, activeTabId]
+  );
+
+  const handleMinimize = useCallback(() => {
+    void appWindow.minimize();
+  }, []);
+
+  const handleToggleMaximize = useCallback(async () => {
+    await appWindow.toggleMaximize();
+    const maximized = await appWindow.isMaximized();
+    setIsMaximized(maximized);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    void appWindow.close();
+  }, []);
+
+  const handleQuickAccessClick = useCallback((path: string) => {
+    void loadDirectory(path);
+  }, [loadDirectory]);
+
+  const handleArchiveSortToggle = useCallback((sortKey: 'date' | 'size') => {
+    setArchiveSortBy(prevSort => {
+      if (prevSort === sortKey) {
+        setArchiveSortDirection(prevDir => (prevDir === 'asc' ? 'desc' : 'asc'));
+        return prevSort;
+      }
+      setArchiveSortDirection('desc');
+      return sortKey;
+    });
+  }, []);
+
+  const handleArchiveClick = useCallback(async (zip: RecentZipFile) => {
+    const separator = zip.path.includes('\\') ? '\\' : '/';
+    const dir = zip.path.split(/[/\\]/).slice(0, -1).join(separator);
+
+    await loadDirectory(dir);
+
+    setTimeout(() => {
+      setTabs(prevTabs =>
+        prevTabs.map(tab =>
+          tab.id === activeTabId
+            ? { ...tab, selectedFiles: new Set([zip.path]), lastSelectedFile: zip.path }
+            : tab
+        )
+      );
+
+      setTimeout(() => {
+        const selectedRow = document.querySelector('.file-row.selected');
+        if (selectedRow) {
+          selectedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
+    }, 100);
+  }, [loadDirectory, activeTabId]);
+
+  const handleArchiveContextMenu = useCallback(async (zip: RecentZipFile, event: ReactMouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    const separator = zip.path.includes('\\') ? '\\' : '/';
+    const dir = zip.path.split(/[/\\]/).slice(0, -1).join(separator);
+
+    await loadDirectory(dir);
+
+    const fileEntry: FileEntry = {
+      name: zip.name,
+      path: zip.path,
+      size: zip.size,
+      is_directory: false,
+      modified: zip.modified,
+      file_type: zip.name.split('.').pop()?.toUpperCase() || '',
+      is_archive: true
+    };
+
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      file: fileEntry
+    });
+  }, [loadDirectory]);
+
+
+  async function handleDropOnTab(targetTabId: string, e: ReactDragEvent<HTMLElement>) {
     e.preventDefault();
     if (!draggedFile || !draggedFromTab) return;
 
@@ -608,7 +830,7 @@ function App() {
     setDraggedFromTab(null);
   }
 
-  async function handleDropOnFolder(targetPath: string, e: React.DragEvent) {
+  async function handleDropOnFolder(targetPath: string, e: ReactDragEvent<HTMLElement>) {
     e.preventDefault();
     e.stopPropagation();
     if (!draggedFile) return;
@@ -632,7 +854,7 @@ function App() {
     setDraggedFromTab(null);
   }
 
-  async function handleDropOnQuickAccess(targetPath: string, e: React.DragEvent) {
+  async function handleDropOnQuickAccess(targetPath: string, e: ReactDragEvent<HTMLElement>) {
     e.preventDefault();
     e.stopPropagation();
     if (!draggedFile) return;
@@ -676,7 +898,7 @@ function App() {
     }
   }
 
-  function getSortedArchives(): RecentZipFile[] {
+  const sortedArchives = useMemo(() => {
     if (recentZips.length === 0) return [];
 
     const sorted = [...recentZips].sort((a, b) => {
@@ -692,7 +914,7 @@ function App() {
     });
 
     return sorted;
-  }
+  }, [recentZips, archiveSortBy, archiveSortDirection]);
 
   async function handleCreateFolder() {
     if (!newFolderName.trim()) {
@@ -717,7 +939,15 @@ function App() {
     }
   }
 
-  const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeTab = useMemo(
+    () => tabs.find(t => t.id === activeTabId) ?? null,
+    [tabs, activeTabId]
+  );
+  const activeFiles = useMemo(() => activeTab?.files ?? [], [activeTab]);
+  const selectedFiles = useMemo(
+    () => (activeTab ? activeTab.selectedFiles : EMPTY_SELECTION),
+    [activeTab]
+  );
 
   // Apply dark mode to body based on settings
   useEffect(() => {
@@ -743,205 +973,31 @@ function App() {
       />
 
       {/* Custom Title Bar */}
-      <div className="titlebar" data-tauri-drag-region>
-        <div className="titlebar-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256" style={{ marginRight: '0.5rem' }}>
-            <path d="M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.94,51.2a16.14,16.14,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64Z" />
-          </svg>
-          UNBOX
-        </div>
-        <div className="titlebar-controls">
-          <button className="titlebar-button titlebar-minimize" onClick={() => appWindow.minimize()} title="Minimize">
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <rect x="2" y="5.5" width="8" height="1" fill="currentColor"/>
-            </svg>
-          </button>
-          <button className="titlebar-button titlebar-maximize" onClick={async () => {
-            await appWindow.toggleMaximize();
-            const maximized = await appWindow.isMaximized();
-            setIsMaximized(maximized);
-          }} title={isMaximized ? "Restore" : "Maximize"}>
-            {isMaximized ? (
-              <svg width="12" height="12" viewBox="0 0 12 12">
-                <rect x="3.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/>
-                <rect x="1.5" y="3.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/>
-              </svg>
-            ) : (
-              <svg width="12" height="12" viewBox="0 0 12 12">
-                <rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1"/>
-              </svg>
-            )}
-          </button>
-          <button className="titlebar-button titlebar-close" onClick={() => appWindow.close()} title="Close">
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </div>
-      </div>
+      <TitleBar
+        isMaximized={isMaximized}
+        onMinimize={handleMinimize}
+        onToggleMaximize={handleToggleMaximize}
+        onClose={handleClose}
+      />
 
       <div className="main-layout">
         {/* Sidebar with pinned folders */}
-        <div className="sidebar">
-          {/* Quick Access */}
-          <div className="sidebar-section">
-            <button
-              className="sidebar-folder-header"
-              onClick={() => toggleFolder("quick-access")}
-            >
-              <svg className="folder-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" style={{ transform: expandedFolders.has("quick-access") ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                <path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/>
-              </svg>
-              Quick Access
-            </button>
-            {expandedFolders.has("quick-access") && (
-              <div className="sidebar-items">
-                {pinnedFolders.map(([name, path]) => (
-                  <button
-                    key={path}
-                    className="sidebar-item quick-access-item"
-                    onClick={() => loadDirectory(path)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDropOnQuickAccess(path, e)}
-                  >
-                    {getFolderIcon(name)}
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recent Archives */}
-          {recentZips.length > 0 && (
-            <div className="sidebar-section">
-              <button
-                className="sidebar-folder-header"
-                onClick={() => toggleFolder("recent-archives")}
-              >
-                <svg className="folder-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" style={{ transform: expandedFolders.has("recent-archives") ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                  <path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/>
-                </svg>
-                Recent Archives ({recentZips.length})
-              </button>
-              {expandedFolders.has("recent-archives") && (
-                <>
-                  <div className="archive-sort-controls">
-                    <button
-                      className={`archive-sort-btn ${archiveSortBy === 'date' ? 'active' : ''}`}
-                      onClick={() => {
-                        if (archiveSortBy === 'date') {
-                          setArchiveSortDirection(archiveSortDirection === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setArchiveSortBy('date');
-                          setArchiveSortDirection('desc');
-                        }
-                      }}
-                      title={`Sort by date modified (${archiveSortBy === 'date' ? (archiveSortDirection === 'asc' ? 'oldest first' : 'newest first') : 'click to sort'})`}
-                    >
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Date</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'date' ? 1 : 0.3 }}>
-                        {(archiveSortBy === 'date' && archiveSortDirection === 'asc') || archiveSortBy !== 'date' ? (
-                          <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
-                        ) : (
-                          <path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/>
-                        )}
-                      </svg>
-                    </button>
-                    <button
-                      className={`archive-sort-btn ${archiveSortBy === 'size' ? 'active' : ''}`}
-                      onClick={() => {
-                        if (archiveSortBy === 'size') {
-                          setArchiveSortDirection(archiveSortDirection === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setArchiveSortBy('size');
-                          setArchiveSortDirection('desc');
-                        }
-                      }}
-                      title={`Sort by size (${archiveSortBy === 'size' ? (archiveSortDirection === 'asc' ? 'smallest first' : 'largest first') : 'click to sort'})`}
-                    >
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Size</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'size' ? 1 : 0.3 }}>
-                        {(archiveSortBy === 'size' && archiveSortDirection === 'asc') || archiveSortBy !== 'size' ? (
-                          <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
-                        ) : (
-                          <path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/>
-                        )}
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="sidebar-items archive-scrollable" key={`${archiveSortBy}-${archiveSortDirection}`}>
-                    {getSortedArchives().map((zip, index) => (
-                    <button
-                      key={`${zip.path}-${index}-${archiveSortBy}-${archiveSortDirection}`}
-                      className="sidebar-item"
-                      onClick={async () => {
-                        const dir = zip.path.split(/[/\\]/).slice(0, -1).join(zip.path.includes('\\') ? '\\' : '/');
-
-                        // Load directory containing the ZIP file
-                        await loadDirectory(dir);
-
-                        // Small delay to ensure state updates, then select and scroll to the zip file
-                        setTimeout(() => {
-                          setTabs(prevTabs => prevTabs.map(tab =>
-                            tab.id === activeTabId
-                              ? { ...tab, selectedFiles: new Set([zip.path]) }
-                              : tab
-                          ));
-
-                          // Scroll to the selected file
-                          setTimeout(() => {
-                            const selectedRow = document.querySelector('.file-row.selected');
-                            if (selectedRow) {
-                              selectedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }
-                          }, 150);
-                        }, 100);
-                      }}
-                      onContextMenu={async (e) => {
-                        e.preventDefault();
-                        const dir = zip.path.split(/[/\\]/).slice(0, -1).join(zip.path.includes('\\') ? '\\' : '/');
-                        await loadDirectory(dir);
-
-                        // Create a temporary FileEntry for the context menu
-                        const fileEntry: FileEntry = {
-                          name: zip.name,
-                          path: zip.path,
-                          size: zip.size,
-                          is_directory: false,
-                          modified: zip.modified,
-                          file_type: zip.name.split('.').pop()?.toUpperCase() || '',
-                          is_archive: true
-                        };
-
-                        setContextMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          file: fileEntry
-                        });
-                      }}
-                      title={zip.path}
-                    >
-                      <div className="archive-item-content">
-                        <svg className="icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
-                          <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-48-80a8,8,0,0,1-8,8H136v8h8a8,8,0,0,1,0,16h-8v8a8,8,0,0,1-16,0v-8h-8a8,8,0,0,1,0-16h8v-8h-8a8,8,0,0,1,0-16h8v-8a8,8,0,0,1,16,0v8h8A8,8,0,0,1,152,136Z"/>
-                        </svg>
-                        <div className="archive-item-info">
-                          <span className="sidebar-item-text">{zip.name}</span>
-                          <div className="archive-item-meta">
-                            <span className="archive-size">{formatSize(zip.size)}</span>
-                            <span className="archive-date">{zip.modified}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        <Sidebar
+          expandedFolders={expandedFolders}
+          onToggleFolder={toggleFolder}
+          pinnedFolders={pinnedFolders}
+          onQuickAccessSelect={handleQuickAccessClick}
+          onQuickAccessDrop={handleDropOnQuickAccess}
+          onDragOver={handleDragOver}
+          archives={sortedArchives}
+          archiveSortBy={archiveSortBy}
+          archiveSortDirection={archiveSortDirection}
+          onArchiveSortToggle={handleArchiveSortToggle}
+          onArchiveSelect={handleArchiveClick}
+          onArchiveContextMenu={handleArchiveContextMenu}
+          formatSize={formatSize}
+          getFolderIcon={getFolderIcon}
+        />
 
         {/* Main content area */}
         <div className="main-content">
@@ -1109,83 +1165,22 @@ function App() {
               </button>
             )}
           </div>
-          <div className="table-container" ref={tableRef}>
-            <div className="table-wrapper">
-              <table className="file-table" style={{
-                fontSize: `${zoomLevel * 16}px`,
-              }}>
-                <thead>
-                  <tr>
-                    <th className="th-name">Name</th>
-                    <th className="th-size th-sortable" onClick={() => handleSort('size')}>
-                      <div className="th-content">
-                        Size
-                        {sortColumn === 'size' && (
-                          <svg className="sort-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256">
-                            {sortDirection === 'asc' ? (
-                              <path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/>
-                            ) : (
-                              <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
-                            )}
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                    <th className="th-modified th-sortable" onClick={() => handleSort('modified')}>
-                      <div className="th-content">
-                        Last Modified
-                        {sortColumn === 'modified' && (
-                          <svg className="sort-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256">
-                            {sortDirection === 'asc' ? (
-                              <path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/>
-                            ) : (
-                              <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
-                            )}
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeTab?.files.map((file) => (
-                    <tr
-                      key={file.path}
-                      className={`file-row ${activeTab.selectedFiles.has(file.path) ? 'selected' : ''}`}
-                      onClick={(e) => handleFileSelect(file.path, e)}
-                      onDoubleClick={() => handleFileDoubleClick(file)}
-                      onContextMenu={(e) => handleFileRightClick(file, e)}
-                      draggable
-                      onDragStart={(e) => handleDragStart(file, activeTabId, e)}
-                      onDragOver={file.is_directory ? handleDragOver : undefined}
-                      onDrop={file.is_directory ? (e) => handleDropOnFolder(file.path, e) : undefined}
-                    >
-                      <td className={`file-name ${file.name.toLowerCase().endsWith('.zip') ? 'zip-file' : ''}`}>
-                        {file.is_directory ? (
-                          <svg className="folder-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                            <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Z" />
-                          </svg>
-                        ) : file.name.toLowerCase().endsWith('.zip') ? (
-                          <svg className="zip-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                            <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-48-80a8,8,0,0,1-8,8H136v8h8a8,8,0,0,1,0,16h-8v8a8,8,0,0,1-16,0v-8h-8a8,8,0,0,1,0-16h8v-8h-8a8,8,0,0,1,0-16h8v-8a8,8,0,0,1,16,0v8h8A8,8,0,0,1,152,136Z"/>
-                          </svg>
-                        ) : file.is_archive ? (
-                          <svg className="archive-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
-                            <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Z"/>
-                          </svg>
-                        ) : null}
-                        <span className={file.name.toLowerCase().endsWith('.zip') ? 'zip-text' : ''}>{file.name}</span>
-                      </td>
-                      <td className={`file-size ${file.name.toLowerCase().endsWith('.zip') ? 'zip-size' : ''}`}>
-                        {file.is_directory ? "—" : formatSize(file.size)}
-                      </td>
-                      <td className={`file-modified ${file.name.toLowerCase().endsWith('.zip') ? 'zip-modified' : ''}`}>{file.modified}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <FileTable
+            ref={tableRef}
+            files={activeFiles}
+            selectedFiles={selectedFiles}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            zoomLevel={zoomLevel}
+            onSelect={handleFileSelect}
+            onDoubleClick={handleFileDoubleClick}
+            onContextMenu={handleFileRightClick}
+            onSort={handleSort}
+            onDragStart={handleRowDragStart}
+            onDragOver={handleDragOver}
+            onDropOnFolder={handleDropOnFolder}
+            formatSize={formatSize}
+          />
 
           {/* Action buttons */}
           <div className="actions">

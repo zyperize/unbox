@@ -28,6 +28,7 @@ export interface TabData {
   name: string;
   files: FileEntry[];
   selectedFiles: Set<string>;
+  lastSelectedFile: string | null;
 }
 
 export interface ContextMenu {
