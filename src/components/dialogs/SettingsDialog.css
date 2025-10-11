@@ -1,0 +1,469 @@
+/* Settings Dialog Specific Styles */
+.settings-dialog {
+  min-width: 700px;
+  max-width: 800px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 4px solid #1c140d;
+  background: #f4ede6;
+}
+
+.settings-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #f4ede6;
+  border: none;
+  border-right: 3px solid #1c140d;
+  color: #1c140d;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.settings-tab:last-child {
+  border-right: none;
+}
+
+.settings-tab:hover {
+  background: #ede5dc;
+}
+
+.settings-tab.active {
+  background: #f98006;
+  color: #1c140d;
+}
+
+.settings-tab svg {
+  flex-shrink: 0;
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  max-height: 500px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.settings-section-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #1c140d;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-label {
+  font-weight: 700;
+  color: #1c140d;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-select {
+  padding: 0.75rem;
+  border: 3px solid #1c140d;
+  background: #fcfaf8;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1c140d;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 0 #1c140d;
+  transition: all 0.1s;
+}
+
+.settings-select:hover {
+  box-shadow: 4px 4px 0 0 #1c140d;
+}
+
+.settings-select:focus {
+  outline: none;
+  border-color: #f98006;
+  box-shadow: 4px 4px 0 0 #1c140d;
+}
+
+.settings-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  background: #f4ede6;
+  border: 3px solid #1c140d;
+  outline: none;
+  cursor: pointer;
+}
+
+.settings-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: #f98006;
+  border: 3px solid #1c140d;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 0 #1c140d;
+  transition: all 0.1s;
+}
+
+.settings-range::-webkit-slider-thumb:hover {
+  background: #e07305;
+  box-shadow: 4px 4px 0 0 #1c140d;
+}
+
+.settings-range::-webkit-slider-thumb:active {
+  box-shadow: 2px 2px 0 0 #1c140d;
+}
+
+.settings-range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: #f98006;
+  border: 3px solid #1c140d;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 0 #1c140d;
+}
+
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-checkbox input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #1c140d;
+  background: #fcfaf8;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  box-shadow: 3px 3px 0 0 #1c140d;
+}
+
+.settings-checkbox input[type="checkbox"]:checked {
+  background: #f98006;
+}
+
+.settings-checkbox input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 12px;
+  border: solid #1c140d;
+  border-width: 0 3px 3px 0;
+  transform: translate(-50%, -60%) rotate(45deg);
+}
+
+.settings-checkbox span {
+  font-weight: 600;
+  color: #1c140d;
+  font-size: 0.875rem;
+}
+
+/* Shortcuts List */
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.875rem 1rem;
+  background: #f4ede6;
+  border: 3px solid #1c140d;
+  box-shadow: 3px 3px 0 0 #1c140d;
+}
+
+.shortcut-description {
+  font-weight: 600;
+  color: #1c140d;
+  font-size: 0.875rem;
+}
+
+.shortcut-keys {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.shortcut-keys kbd {
+  padding: 0.25rem 0.5rem;
+  background: #fcfaf8;
+  border: 2px solid #1c140d;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1c140d;
+  box-shadow: 2px 2px 0 0 #1c140d;
+  min-width: 2rem;
+  text-align: center;
+}
+
+/* Dark Mode - Settings Dialog */
+.dark-mode .settings-tabs {
+  border-bottom: 4px solid #3d3529;
+  background: #1a1410;
+}
+
+.dark-mode .settings-tab {
+  background: #2a2419;
+  border-right: 3px solid #3d3529;
+  color: #f5f3f0;
+}
+
+.dark-mode .settings-tab:hover {
+  background: #3d3529;
+}
+
+.dark-mode .settings-tab.active {
+  background: #f98006;
+  color: #0f0c09;
+}
+
+.dark-mode .settings-section-title {
+  color: #f5f3f0;
+}
+
+.dark-mode .settings-label {
+  color: #f5f3f0;
+}
+
+.dark-mode .settings-select {
+  border: 3px solid #3d3529;
+  background: #1a1410;
+  color: #f5f3f0;
+  box-shadow: 3px 3px 0 0 #3d3529;
+}
+
+.dark-mode .settings-select:hover {
+  box-shadow: 4px 4px 0 0 #3d3529;
+}
+
+.dark-mode .settings-select:focus {
+  border-color: #f98006;
+  box-shadow: 4px 4px 0 0 #3d3529;
+}
+
+.dark-mode .settings-range {
+  background: #2a2419;
+  border: 3px solid #3d3529;
+}
+
+.dark-mode .settings-range::-webkit-slider-thumb {
+  background: #f98006;
+  border: 3px solid #3d3529;
+  box-shadow: 3px 3px 0 0 #3d3529;
+}
+
+.dark-mode .settings-range::-webkit-slider-thumb:hover {
+  background: #e07305;
+  box-shadow: 4px 4px 0 0 #3d3529;
+}
+
+.dark-mode .settings-range::-webkit-slider-thumb:active {
+  box-shadow: 2px 2px 0 0 #3d3529;
+}
+
+.dark-mode .settings-range::-moz-range-thumb {
+  background: #f98006;
+  border: 3px solid #3d3529;
+  box-shadow: 3px 3px 0 0 #3d3529;
+}
+
+.dark-mode .settings-checkbox input[type="checkbox"] {
+  border: 3px solid #3d3529;
+  background: #2a2419;
+  box-shadow: 3px 3px 0 0 #3d3529;
+}
+
+.dark-mode .settings-checkbox input[type="checkbox"]:checked {
+  background: #f98006;
+}
+
+.dark-mode .settings-checkbox input[type="checkbox"]:checked::after {
+  border-color: #0f0c09;
+}
+
+.dark-mode .settings-checkbox span {
+  color: #f5f3f0;
+}
+
+.dark-mode .shortcut-item {
+  background: #2a2419;
+  border: 3px solid #3d3529;
+  box-shadow: 3px 3px 0 0 #3d3529;
+}
+
+.dark-mode .shortcut-description {
+  color: #f5f3f0;
+}
+
+.dark-mode .shortcut-keys kbd {
+  background: #1a1410;
+  border: 2px solid #3d3529;
+  color: #f5f3f0;
+  box-shadow: 2px 2px 0 0 #3d3529;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .settings-dialog {
+    min-width: 85vw;
+    max-width: 90vw;
+  }
+
+  .settings-content {
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-dialog {
+    min-width: 95vw;
+    max-height: 85vh;
+  }
+
+  .settings-tabs {
+    flex-wrap: wrap;
+  }
+
+  .settings-tab {
+    flex: 1 1 48%;
+    min-width: 48%;
+    font-size: 0.75rem;
+    padding: 0.75rem;
+    gap: 0.35rem;
+  }
+
+  .settings-tab svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .settings-content {
+    padding: 1.5rem;
+    max-height: 350px;
+  }
+
+  .settings-section-title {
+    font-size: 1rem;
+  }
+
+  .settings-label {
+    font-size: 0.75rem;
+  }
+
+  .settings-select,
+  .settings-checkbox span {
+    font-size: 0.75rem;
+  }
+
+  .shortcut-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .shortcut-description {
+    font-size: 0.75rem;
+  }
+
+  .shortcut-keys kbd {
+    font-size: 0.7rem;
+    min-width: 1.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-dialog {
+    min-width: 98vw;
+    max-height: 90vh;
+  }
+
+  .settings-tab {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+
+  .settings-content {
+    padding: 1rem;
+    max-height: 300px;
+  }
+
+  .dialog-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .dialog-btn {
+    width: 100%;
+  }
+}
+
+/* Improved scrollbar for settings content */
+.settings-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.settings-content::-webkit-scrollbar-track {
+  background: #f4ede6;
+  border-left: 2px solid #1c140d;
+}
+
+.settings-content::-webkit-scrollbar-thumb {
+  background: #f98006;
+  border: 2px solid #1c140d;
+}
+
+.settings-content::-webkit-scrollbar-thumb:hover {
+  background: #e07305;
+}
+
+.dark-mode .settings-content::-webkit-scrollbar-track {
+  background: #2a2419;
+  border-left: 2px solid #3d3529;
+}
+
+.dark-mode .settings-content::-webkit-scrollbar-thumb {
+  background: #f98006;
+  border: 2px solid #3d3529;
+}
+
+.dark-mode .settings-content::-webkit-scrollbar-thumb:hover {
+  background: #e07305;
+}

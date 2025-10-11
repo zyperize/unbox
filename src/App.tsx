@@ -2,47 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
+import { useSettings } from "./contexts/SettingsContext";
+import { SettingsDialog } from "./components/dialogs/SettingsDialog";
+import type { FileEntry, DirectoryContents, RecentZipFile, TabData, ContextMenu, ClipboardData } from "./types";
 
 const appWindow = getCurrentWindow();
 
-interface FileEntry {
-  name: string;
-  path: string;
-  size: number;
-  is_directory: boolean;
-  modified: string;
-  file_type: string;
-  is_archive: boolean;
-}
-
-interface DirectoryContents {
-  current_path: string;
-  files: FileEntry[];
-}
-
-interface TabData {
-  id: string;
-  path: string;
-  name: string;
-  files: FileEntry[];
-  selectedFiles: Set<string>;
-}
-
-interface RecentZipFile {
-  name: string;
-  path: string;
-  size: number;
-  modified: string;
-  modified_timestamp: number;
-}
-
-interface ContextMenu {
-  x: number;
-  y: number;
-  file: FileEntry;
-}
-
 function App() {
+  const { settings, updateAppearance } = useSettings();
   const [pinnedFolders, setPinnedFolders] = useState<[string, string][]>([]);
   const [recentZips, setRecentZips] = useState<RecentZipFile[]>([]);
   const [tabs, setTabs] = useState<TabData[]>([]);
@@ -57,13 +24,12 @@ function App() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["quick-access", "recent-archives"]));
   const [draggedFile, setDraggedFile] = useState<FileEntry | null>(null);
   const [draggedFromTab, setDraggedFromTab] = useState<string | null>(null);
-  const [clipboard, setClipboard] = useState<{files: string[], operation: 'copy' | 'cut'} | null>(null);
+  const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [sortColumn, setSortColumn] = useState<'name' | 'size' | 'modified' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isMaximized, setIsMaximized] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(0.9);
   const [archiveSortBy, setArchiveSortBy] = useState<'date' | 'size'>('date');
   const [archiveSortDirection, setArchiveSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
@@ -73,8 +39,24 @@ function App() {
   const [confirmDialogCallback, setConfirmDialogCallback] = useState<(() => void) | null>(null);
   const [showAlertDialog, setShowAlertDialog] = useState(false);
   const [alertDialogMessage, setAlertDialogMessage] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
+  // Sync dark mode with settings theme
+  const isDarkMode = settings.appearance.theme === 'dark' ||
+    (settings.appearance.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  const zoomLevel = settings.appearance.zoomLevel;
+
+  // Initialize default sort from settings on first mount
+  useEffect(() => {
+    if (sortColumn === null) {
+      setSortColumn(settings.behavior.defaultSort);
+      setSortDirection(settings.behavior.defaultSortDirection);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     initializeApp();
@@ -94,20 +76,19 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Ctrl + Scroll zoom functionality - adjusts font and spacing
+    // Ctrl + Scroll zoom functionality - adjusts font and spacing (table only)
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey && tableRef.current?.contains(e.target as Node)) {
         e.preventDefault();
-        setZoomLevel(prev => {
-          const delta = e.deltaY > 0 ? -0.05 : 0.05;
-          return Math.max(0.65, Math.min(1.35, prev + delta));
-        });
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        const newZoom = Math.max(1.05, Math.min(2.25, zoomLevel + delta));
+        updateAppearance({ zoomLevel: newZoom });
       }
     };
 
     document.addEventListener('wheel', handleWheel, { passive: false });
     return () => document.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [zoomLevel, updateAppearance]);
 
   useEffect(() => {
     // Mouse button navigation (button 3 = back, button 4 = forward)
@@ -269,6 +250,27 @@ function App() {
   async function loadDirectory(path: string, tabId?: string, addToHistory: boolean = true) {
     try {
       const contents = await invoke<DirectoryContents>("get_directory_contents", { path });
+
+      // Apply hidden files filter (basic: dotfiles) if disabled in settings
+      let files = contents.files;
+      if (!settings.behavior.showHiddenFiles) {
+        files = files.filter(f => !f.name.startsWith('.'));
+      }
+
+      // Apply default sort if user hasn't sorted yet
+      const effectiveSortCol = sortColumn ?? settings.behavior.defaultSort;
+      const effectiveSortDir = sortColumn ? sortDirection : settings.behavior.defaultSortDirection;
+      files = [...files].sort((a, b) => {
+        // Keep directories on top
+        if (a.is_directory && !b.is_directory) return -1;
+        if (!a.is_directory && b.is_directory) return 1;
+
+        let cmp = 0;
+        if (effectiveSortCol === 'name') cmp = a.name.localeCompare(b.name);
+        else if (effectiveSortCol === 'size') cmp = a.size - b.size;
+        else if (effectiveSortCol === 'modified') cmp = a.modified.localeCompare(b.modified);
+        return effectiveSortDir === 'asc' ? cmp : -cmp;
+      });
       const targetTabId = tabId || activeTabId;
 
       setTabs(tabs.map(tab =>
@@ -277,7 +279,7 @@ function App() {
               ...tab,
               path: contents.current_path,
               name: path.split(/[/\\]/).pop() || "Home",
-              files: contents.files,
+              files,
               selectedFiles: new Set()
             }
           : tab
@@ -400,29 +402,29 @@ function App() {
     const activeTab = tabs.find(t => t.id === activeTabId);
     if (!activeTab || activeTab.selectedFiles.size === 0) return;
 
-    showConfirm(`Delete ${activeTab.selectedFiles.size} file(s)?`, async () => {
+    const performDelete = async () => {
       try {
         for (const filePath of activeTab.selectedFiles) {
           await invoke("delete_file", { filePath });
         }
-
         loadDirectory(activeTab.path);
       } catch (error) {
         showAlert(`Failed to delete: ${error}`);
       }
-    });
+    };
+
+    if (settings.behavior.confirmDelete) {
+      showConfirm(`Delete ${activeTab.selectedFiles.size} file(s)?`, performDelete);
+    } else {
+      performDelete();
+    }
   }
 
   function handleSort(column: 'name' | 'size' | 'modified') {
     const activeTab = tabs.find(t => t.id === activeTabId);
     if (!activeTab) return;
 
-    let newDirection: 'asc' | 'desc' = 'asc';
-
-    if (sortColumn === column) {
-      // Toggle direction if clicking same column
-      newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-    }
+    let newDirection: 'asc' | 'desc' = sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc';
 
     setSortColumn(column);
     setSortDirection(newDirection);
@@ -566,20 +568,93 @@ function App() {
     setExpandedFolders(newExpanded);
   }
 
-  function handleDragStart(file: FileEntry, tabId: string) {
+  function handleDragStart(file: FileEntry, tabId: string, e: React.DragEvent) {
     setDraggedFile(file);
     setDraggedFromTab(tabId);
+    e.dataTransfer.effectAllowed = 'move';
   }
 
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   }
 
-  function handleDrop(targetTabId: string) {
+  async function handleDropOnTab(targetTabId: string, e: React.DragEvent) {
+    e.preventDefault();
     if (!draggedFile || !draggedFromTab) return;
 
-    // In a real implementation, you would copy/move the file here
-    console.log(`Moving ${draggedFile.name} to tab ${targetTabId}`);
+    const targetTab = tabs.find(t => t.id === targetTabId);
+    if (!targetTab) return;
+
+    try {
+      const fileName = draggedFile.name;
+      const destPath = `${targetTab.path}${targetTab.path.endsWith('\\') ? '' : '\\'}${fileName}`;
+
+      await invoke("move_file", { sourcePath: draggedFile.path, destPath });
+
+      // Reload both tabs
+      loadDirectory(targetTab.path, targetTabId, false);
+      if (draggedFromTab && draggedFromTab !== targetTabId) {
+        const sourceTab = tabs.find(t => t.id === draggedFromTab);
+        if (sourceTab) {
+          loadDirectory(sourceTab.path, draggedFromTab, false);
+        }
+      }
+    } catch (error) {
+      showAlert(`Failed to move file: ${error}`);
+    }
+
+    setDraggedFile(null);
+    setDraggedFromTab(null);
+  }
+
+  async function handleDropOnFolder(targetPath: string, e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedFile) return;
+
+    try {
+      const fileName = draggedFile.name;
+      const destPath = `${targetPath}${targetPath.endsWith('\\') ? '' : '\\'}${fileName}`;
+
+      await invoke("move_file", { sourcePath: draggedFile.path, destPath });
+
+      // Reload the current tab
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      if (activeTab) {
+        loadDirectory(activeTab.path, activeTabId, false);
+      }
+    } catch (error) {
+      showAlert(`Failed to move file: ${error}`);
+    }
+
+    setDraggedFile(null);
+    setDraggedFromTab(null);
+  }
+
+  async function handleDropOnQuickAccess(targetPath: string, e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedFile) return;
+
+    try {
+      const fileName = draggedFile.name;
+      const destPath = `${targetPath}${targetPath.endsWith('\\') ? '' : '\\'}${fileName}`;
+
+      await invoke("move_file", { sourcePath: draggedFile.path, destPath });
+
+      // Reload the source tab
+      if (draggedFromTab) {
+        const sourceTab = tabs.find(t => t.id === draggedFromTab);
+        if (sourceTab) {
+          loadDirectory(sourceTab.path, draggedFromTab, false);
+        }
+      }
+
+      showAlert(`Moved ${fileName} to ${targetPath}`);
+    } catch (error) {
+      showAlert(`Failed to move file: ${error}`);
+    }
 
     setDraggedFile(null);
     setDraggedFromTab(null);
@@ -644,8 +719,20 @@ function App() {
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
+  // Apply dark mode to body based on settings
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+  }, [isDarkMode]);
+
   return (
-    <div className="app-container">
+    <div
+      className={`app-container ${isDarkMode ? 'dark-mode' : ''} ${settings.appearance.compactMode ? 'compact-mode' : ''} icon-size-${settings.appearance.iconSize}`}
+      style={{ fontSize: `${settings.appearance.fontSize}px` }}
+    >
       {/* Diagonal Resize Handle */}
       <div
         className="resize-handle"
@@ -714,6 +801,8 @@ function App() {
                     key={path}
                     className="sidebar-item quick-access-item"
                     onClick={() => loadDirectory(path)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDropOnQuickAccess(path, e)}
                   >
                     {getFolderIcon(name)}
                     {name}
@@ -750,8 +839,8 @@ function App() {
                       }}
                       title={`Sort by date modified (${archiveSortBy === 'date' ? (archiveSortDirection === 'asc' ? 'oldest first' : 'newest first') : 'click to sort'})`}
                     >
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>Date</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'date' ? 1 : 0.3 }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Date</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'date' ? 1 : 0.3 }}>
                         {(archiveSortBy === 'date' && archiveSortDirection === 'asc') || archiveSortBy !== 'date' ? (
                           <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
                         ) : (
@@ -771,8 +860,8 @@ function App() {
                       }}
                       title={`Sort by size (${archiveSortBy === 'size' ? (archiveSortDirection === 'asc' ? 'smallest first' : 'largest first') : 'click to sort'})`}
                     >
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>Size</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'size' ? 1 : 0.3 }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>Size</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'size' ? 1 : 0.3 }}>
                         {(archiveSortBy === 'size' && archiveSortDirection === 'asc') || archiveSortBy !== 'size' ? (
                           <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
                         ) : (
@@ -870,7 +959,7 @@ function App() {
                   className={`tab ${tab.id === activeTabId ? 'active' : ''}`}
                   onClick={() => switchTab(tab.id)}
                   onDragOver={handleDragOver}
-                  onDrop={() => handleDrop(tab.id)}
+                  onDrop={(e) => handleDropOnTab(tab.id, e)}
                 >
                   <span>{tab.name}</span>
                   {tabs.length > 1 && (
@@ -887,6 +976,34 @@ function App() {
                 +
               </button>
             </div>
+
+            {/* Settings Button */}
+            <button
+              className="settings-toggle"
+              onClick={() => setShowSettings(true)}
+              title="Settings"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
+                <path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"/>
+              </svg>
+            </button>
+
+            {/* Dark Mode Toggle */}
+            <button
+              className="dark-mode-toggle"
+              onClick={() => updateAppearance({ theme: isDarkMode ? 'light' : 'dark' })}
+              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDarkMode ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56A104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/>
+                </svg>
+              )}
+            </button>
 
             {/* Search bar */}
             <div className="search-bar-compact">
@@ -962,30 +1079,41 @@ function App() {
           {/* File table */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="section-title">My Files</h3>
-            {zoomLevel !== 0.9 && (
+            {zoomLevel !== 1.5 && (
               <button
-                onClick={() => setZoomLevel(0.9)}
+                onClick={() => updateAppearance({ zoomLevel: 1.5 })}
                 style={{
-                  padding: '0.25rem 0.5rem',
+                  padding: '0.4rem 0.75rem',
                   background: 'transparent',
-                  border: '2px solid #1c140d',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
+                  border: '3px solid #1c140d',
+                  fontSize: '0.875rem',
+                  fontWeight: 900,
                   cursor: 'pointer',
-                  color: '#1c140d',
-                  opacity: 0.5,
-                  transition: 'opacity 0.2s'
+                  color: '#f98006',
+                  opacity: 0.7,
+                  transition: 'opacity 0.2s, transform 0.1s',
+                  boxShadow: '2px 2px 0 0 #1c140d'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.transform = 'translate(-1px, -1px)';
+                  e.currentTarget.style.boxShadow = '3px 3px 0 0 #1c140d';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '0.7';
+                  e.currentTarget.style.transform = 'translate(0, 0)';
+                  e.currentTarget.style.boxShadow = '2px 2px 0 0 #1c140d';
+                }}
               >
-                {((zoomLevel / 0.9) * 100).toFixed(0)}%
+                {((zoomLevel / 1.5) * 100).toFixed(0)}%
               </button>
             )}
           </div>
           <div className="table-container" ref={tableRef}>
             <div className="table-wrapper">
-              <table className="file-table">
+              <table className="file-table" style={{
+                fontSize: `${zoomLevel * 16}px`,
+              }}>
                 <thead>
                   <tr>
                     <th className="th-name">Name</th>
@@ -1028,7 +1156,9 @@ function App() {
                       onDoubleClick={() => handleFileDoubleClick(file)}
                       onContextMenu={(e) => handleFileRightClick(file, e)}
                       draggable
-                      onDragStart={() => handleDragStart(file, activeTabId)}
+                      onDragStart={(e) => handleDragStart(file, activeTabId, e)}
+                      onDragOver={file.is_directory ? handleDragOver : undefined}
+                      onDrop={file.is_directory ? (e) => handleDropOnFolder(file.path, e) : undefined}
                     >
                       <td className={`file-name ${file.name.toLowerCase().endsWith('.zip') ? 'zip-file' : ''}`}>
                         {file.is_directory ? (
@@ -1339,6 +1469,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Settings Dialog */}
+      <SettingsDialog isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 }
