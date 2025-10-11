@@ -4,6 +4,8 @@ use std::path::Path;
 use walkdir::WalkDir;
 use chrono::{DateTime, Local};
 use std::time::SystemTime;
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileEntry {
@@ -326,7 +328,7 @@ fn create_archive(source_path: String, archive_path: String) -> Result<String, S
     Ok(format!("Successfully created archive: {}", archive_path))
 }
 
-// Search files
+// Search files with fuzzy matching
 #[tauri::command]
 fn search_files(directory: String, query: String) -> Result<Vec<FileEntry>, String> {
     let dir_path = Path::new(&directory);
@@ -335,16 +337,24 @@ fn search_files(directory: String, query: String) -> Result<Vec<FileEntry>, Stri
         return Err(format!("Directory does not exist: {}", directory));
     }
 
-    let query_lower = query.to_lowercase();
-    let mut results = Vec::new();
+    // Create fuzzy matcher
+    let matcher = SkimMatcherV2::default();
+    let mut scored_results: Vec<(i64, FileEntry)> = Vec::new();
 
+    // Limit search depth to 3 for better performance
     for entry in WalkDir::new(dir_path)
-        .max_depth(5)
+        .max_depth(3)
         .into_iter()
         .filter_map(|e| e.ok())
     {
+        // Stop if we already have 100 results (performance optimization)
+        if scored_results.len() >= 100 {
+            break;
+        }
+
         if let Some(file_name) = entry.file_name().to_str() {
-            if file_name.to_lowercase().contains(&query_lower) {
+            // Use fuzzy matching to get a score
+            if let Some(score) = matcher.fuzzy_match(file_name, &query) {
                 if let Ok(metadata) = entry.metadata() {
                     let modified = metadata.modified()
                         .ok()
@@ -376,7 +386,7 @@ fn search_files(directory: String, query: String) -> Result<Vec<FileEntry>, Stri
                         "7z" | "zip" | "rar" | "tar" | "gz" | "bz2" | "xz"
                     );
 
-                    results.push(FileEntry {
+                    scored_results.push((score, FileEntry {
                         name: file_name.to_string(),
                         path: entry.path().to_string_lossy().to_string(),
                         size: metadata.len(),
@@ -384,36 +394,50 @@ fn search_files(directory: String, query: String) -> Result<Vec<FileEntry>, Stri
                         modified,
                         file_type,
                         is_archive,
-                    });
+                    }));
                 }
             }
         }
     }
 
+    // Sort by score (highest first)
+    scored_results.sort_by(|a, b| b.0.cmp(&a.0));
+
+    // Limit to top 50 results
+    scored_results.truncate(50);
+
+    // Extract just the FileEntry objects, discarding scores
+    let results = scored_results.into_iter()
+        .map(|(_, entry)| entry)
+        .collect();
+
     Ok(results)
 }
 
-// Get recent zip files from common directories
+// Get recent zip files from common directories (optimized)
 #[tauri::command]
 fn get_recent_zip_files() -> Result<Vec<RecentZipFile>, String> {
     let mut zip_files = Vec::new();
     let archive_extensions = ["7z", "zip", "rar", "tar", "gz", "bz2", "xz"];
 
-    // Search in common directories
+    // Only search Downloads and Desktop for better performance
     let search_dirs = vec![
-        dirs::home_dir(),
         dirs::download_dir(),
-        dirs::document_dir(),
         dirs::desktop_dir(),
     ];
 
     for dir_option in search_dirs {
         if let Some(dir) = dir_option {
             for entry in WalkDir::new(dir)
-                .max_depth(3)
+                .max_depth(2)  // Reduced from 3 to 2
                 .into_iter()
                 .filter_map(|e| e.ok())
             {
+                // Stop early if we have enough results
+                if zip_files.len() >= 50 {
+                    break;
+                }
+
                 if let Ok(metadata) = entry.metadata() {
                     if metadata.is_file() {
                         if let Some(ext) = entry.path().extension() {

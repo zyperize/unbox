@@ -124,13 +124,9 @@ body {
   box-shadow: 2px 2px 0 0 #1c140d;
 }
 
-.titlebar-minimize:hover {
-  background-color: #fbbf24;
-  color: #1c140d;
-}
-
+.titlebar-minimize:hover,
 .titlebar-maximize:hover {
-  background-color: #22c55e;
+  background-color: #f4ede6;
   color: #1c140d;
 }
 

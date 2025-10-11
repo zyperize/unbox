@@ -48,6 +48,7 @@ function App() {
   const [tabs, setTabs] = useState<TabData[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [showExtractDialog, setShowExtractDialog] = useState(false);
   const [extractPath, setExtractPath] = useState("");
@@ -153,6 +154,44 @@ function App() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [historyIndex, navigationHistory, activeTabId]);
+
+  // Live search with debouncing and minimum query length
+  useEffect(() => {
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab) return;
+
+    // If search query is empty, reload the directory
+    if (!searchQuery.trim()) {
+      loadDirectory(activeTab.path, activeTabId, false);
+      return;
+    }
+
+    // Only search if query is at least 2 characters
+    if (searchQuery.trim().length < 2) {
+      return;
+    }
+
+    // Debounce the search - wait 500ms after user stops typing
+    const timeoutId = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await invoke<FileEntry[]>("search_files", {
+          directory: activeTab.path,
+          query: searchQuery
+        });
+
+        setTabs(tabs.map(tab =>
+          tab.id === activeTabId ? { ...tab, files: results } : tab
+        ));
+      } catch (error) {
+        console.error("Search failed:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, activeTabId]);
 
   function showAlert(message: string) {
     setAlertDialogMessage(message);
@@ -279,26 +318,6 @@ function App() {
     }
   }
 
-  async function handleSearch() {
-    const activeTab = tabs.find(t => t.id === activeTabId);
-    if (!activeTab || !searchQuery.trim()) {
-      if (activeTab) loadDirectory(activeTab.path);
-      return;
-    }
-
-    try {
-      const results = await invoke<FileEntry[]>("search_files", {
-        directory: activeTab.path,
-        query: searchQuery
-      });
-
-      setTabs(tabs.map(tab =>
-        tab.id === activeTabId ? { ...tab, files: results } : tab
-      ));
-    } catch (error) {
-      console.error("Search failed:", error);
-    }
-  }
 
   function handleFileDoubleClick(file: FileEntry) {
     if (file.is_directory) {
@@ -646,8 +665,8 @@ function App() {
         </div>
         <div className="titlebar-controls">
           <button className="titlebar-button titlebar-minimize" onClick={() => appWindow.minimize()} title="Minimize">
-            <svg width="16" height="16" viewBox="0 0 16 16">
-              <rect x="2" y="7" width="12" height="3" fill="currentColor"/>
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <rect x="2" y="5.5" width="8" height="1" fill="currentColor"/>
             </svg>
           </button>
           <button className="titlebar-button titlebar-maximize" onClick={async () => {
@@ -656,19 +675,19 @@ function App() {
             setIsMaximized(maximized);
           }} title={isMaximized ? "Restore" : "Maximize"}>
             {isMaximized ? (
-              <svg width="16" height="16" viewBox="0 0 16 16">
-                <rect x="4" y="2" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3"/>
-                <rect x="2" y="4" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3"/>
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <rect x="3.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/>
+                <rect x="1.5" y="3.5" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1"/>
               </svg>
             ) : (
-              <svg width="16" height="16" viewBox="0 0 16 16">
-                <rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3"/>
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1"/>
               </svg>
             )}
           </button>
           <button className="titlebar-button titlebar-close" onClick={() => appWindow.close()} title="Close">
-            <svg width="16" height="16" viewBox="0 0 16 16">
-              <path d="M2 2 L14 14 M14 2 L2 14" stroke="currentColor" strokeWidth="3" strokeLinecap="square"/>
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
@@ -731,9 +750,7 @@ function App() {
                       }}
                       title={`Sort by date modified (${archiveSortBy === 'date' ? (archiveSortDirection === 'asc' ? 'oldest first' : 'newest first') : 'click to sort'})`}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256">
-                        <path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Z"/>
-                      </svg>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>Date</span>
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'date' ? 1 : 0.3 }}>
                         {(archiveSortBy === 'date' && archiveSortDirection === 'asc') || archiveSortBy !== 'date' ? (
                           <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
@@ -754,9 +771,7 @@ function App() {
                       }}
                       title={`Sort by size (${archiveSortBy === 'size' ? (archiveSortDirection === 'asc' ? 'smallest first' : 'largest first') : 'click to sort'})`}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256">
-                        <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34Z"/>
-                      </svg>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>Size</span>
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 256 256" style={{ opacity: archiveSortBy === 'size' ? 1 : 0.3 }}>
                         {(archiveSortBy === 'size' && archiveSortDirection === 'asc') || archiveSortBy !== 'size' ? (
                           <path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/>
@@ -885,12 +900,23 @@ function App() {
                   placeholder="Search files"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
+                {isSearching && (
+                  <div className="search-loading" style={{
+                    position: 'absolute',
+                    right: searchQuery ? '2rem' : '0.5rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '0.75rem',
+                    color: '#666',
+                    pointerEvents: 'none'
+                  }}>
+                    ...
+                  </div>
+                )}
                 {searchQuery && (
                   <button className="search-clear-compact" onClick={() => {
                     setSearchQuery("");
-                    if (activeTab) loadDirectory(activeTab.path);
                   }}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256">
                       <path d="M165.66,101.66,139.31,128l26.35,26.34a8,8,0,0,1-11.32,11.32L128,139.31l-26.34,26.35a8,8,0,0,1-11.32-11.32L116.69,128,90.34,101.66a8,8,0,0,1,11.32-11.32L128,116.69l26.34-26.35a8,8,0,0,1,11.32,11.32ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z" />

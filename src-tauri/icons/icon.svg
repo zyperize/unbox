@@ -1,0 +1,20 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orange background -->
+  <rect width="512" height="512" fill="#f98006"/>
+
+  <!-- Black border -->
+  <rect width="512" height="512" fill="none" stroke="#1c140d" stroke-width="24"/>
+
+  <!-- White "U" letter -->
+  <text
+    x="256"
+    y="380"
+    font-family="Space Grotesk, Arial, sans-serif"
+    font-size="360"
+    font-weight="900"
+    text-anchor="middle"
+    fill="#fcfaf8"
+    stroke="#1c140d"
+    stroke-width="8"
+    paint-order="stroke">U</text>
+</svg>
