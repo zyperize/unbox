@@ -45,6 +45,11 @@ function App() {
   const [showAlertDialog, setShowAlertDialog] = useState(false);
   const [alertDialogMessage, setAlertDialogMessage] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [showCreateArchiveDialog, setShowCreateArchiveDialog] = useState(false);
+  const [archiveName, setArchiveName] = useState("");
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameFileName, setRenameFileName] = useState("");
+  const [renamingFile, setRenamingFile] = useState<FileEntry | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -183,6 +188,28 @@ function App() {
       if ((event.key === 'a' || event.key === 'A') && event.ctrlKey) {
         event.preventDefault();
         handleSelectAll();
+      } else if ((event.key === 'c' || event.key === 'C') && event.ctrlKey) {
+        event.preventDefault();
+        handleCopy();
+      } else if ((event.key === 'x' || event.key === 'X') && event.ctrlKey) {
+        event.preventDefault();
+        handleCut();
+      } else if ((event.key === 'v' || event.key === 'V') && event.ctrlKey) {
+        event.preventDefault();
+        handlePaste();
+      } else if (event.key === 'Delete') {
+        event.preventDefault();
+        handleDelete();
+      } else if (event.key === 'F2') {
+        event.preventDefault();
+        const activeTab = tabs.find(t => t.id === activeTabId);
+        if (activeTab && activeTab.selectedFiles.size === 1) {
+          const selectedPath = Array.from(activeTab.selectedFiles)[0];
+          const selectedFile = activeTab.files.find(f => f.path === selectedPath);
+          if (selectedFile) {
+            openRenameDialog(selectedFile);
+          }
+        }
       } else if (event.key === 'Escape') {
         handleClearSelection();
       }
@@ -190,7 +217,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyboardShortcuts);
     return () => window.removeEventListener('keydown', handleKeyboardShortcuts);
-  }, [handleSelectAll, handleClearSelection]);
+  }, [handleSelectAll, handleClearSelection, tabs, activeTabId]);
 
   useEffect(() => {
     // Backspace key navigation to go back
@@ -319,6 +346,10 @@ function App() {
       setTabs([newTab]);
       setActiveTabId(newTabId);
       setExtractPath(homeDir);
+
+      // Initialize navigation history with home directory
+      setNavigationHistory([homeDir]);
+      setHistoryIndex(0);
     } catch (error) {
       console.error("Failed to initialize:", error);
     }
@@ -409,13 +440,12 @@ function App() {
 
   const handleFileRightClick = useCallback((file: FileEntry, event: ReactMouseEvent<HTMLTableRowElement>) => {
     event.preventDefault();
-    if (file.is_archive) {
-      setContextMenu({
-        x: event.clientX,
-        y: event.clientY,
-        file,
-      });
-    }
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      file,
+      target: 'file',
+    });
   }, []);
 
   const handleFileSelect = useCallback((filePath: string, event: ReactMouseEvent<HTMLTableRowElement>) => {
@@ -498,6 +528,16 @@ function App() {
     setClipboard({
       files: Array.from(activeTab.selectedFiles),
       operation: 'copy'
+    });
+  }
+
+  async function handleCut() {
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab || activeTab.selectedFiles.size === 0) return;
+
+    setClipboard({
+      files: Array.from(activeTab.selectedFiles),
+      operation: 'cut'
     });
   }
 
@@ -601,6 +641,10 @@ function App() {
 
     setTabs([...tabs, newTab]);
     setActiveTabId(newTabId);
+
+    // Reset navigation history for the new tab
+    setNavigationHistory([newPath]);
+    setHistoryIndex(0);
   }
 
   function switchTab(tabId: string) {
@@ -796,7 +840,8 @@ function App() {
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
-      file: fileEntry
+      file: fileEntry,
+      target: 'file',
     });
   }, [loadDirectory]);
 
@@ -939,6 +984,88 @@ function App() {
     }
   }
 
+  async function handleCreateArchive() {
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab || activeTab.selectedFiles.size === 0) return;
+
+    const selectedArray = Array.from(activeTab.selectedFiles);
+    const sourcePath = selectedArray[0];
+
+    // Default archive name based on selection
+    const baseName = sourcePath.split(/[/\\]/).pop() || 'archive';
+    const defaultName = `${baseName}.7z`;
+
+    setArchiveName(defaultName);
+    setShowCreateArchiveDialog(true);
+  }
+
+  async function confirmCreateArchive() {
+    if (!archiveName.trim()) {
+      showAlert("Please enter an archive name");
+      return;
+    }
+
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab || activeTab.selectedFiles.size === 0) return;
+
+    const selectedArray = Array.from(activeTab.selectedFiles);
+    const sourcePath = selectedArray[0];
+    const archivePath = `${activeTab.path}\\${archiveName.trim()}`;
+
+    try {
+      await invoke("create_archive", {
+        sourcePath,
+        archivePath
+      });
+      showAlert("Archive created successfully!");
+      setShowCreateArchiveDialog(false);
+      setArchiveName("");
+      loadDirectory(activeTab.path);
+
+      const recent = await invoke<RecentZipFile[]>("get_recent_zip_files");
+      setRecentZips(recent);
+    } catch (error) {
+      showAlert(`Failed to create archive: ${error}`);
+    }
+  }
+
+  function openRenameDialog(file: FileEntry) {
+    setRenamingFile(file);
+    setRenameFileName(file.name);
+    setShowRenameDialog(true);
+    setContextMenu(null);
+  }
+
+  async function handleRename() {
+    if (!renameFileName.trim() || !renamingFile) {
+      showAlert("Please enter a new name");
+      return;
+    }
+
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab) return;
+
+    const oldPath = renamingFile.path;
+    const parentPath = oldPath.split(/[/\\]/).slice(0, -1).join('\\') || oldPath.split(/[/\\]/).slice(0, -1).join('/');
+    const newPath = `${parentPath}\\${renameFileName.trim()}`;
+
+    if (oldPath === newPath) {
+      setShowRenameDialog(false);
+      setRenamingFile(null);
+      return;
+    }
+
+    try {
+      await invoke("move_file", { sourcePath: oldPath, destPath: newPath });
+      setShowRenameDialog(false);
+      setRenamingFile(null);
+      setRenameFileName("");
+      loadDirectory(activeTab.path);
+    } catch (error) {
+      showAlert(`Failed to rename: ${error}`);
+    }
+  }
+
   const activeTab = useMemo(
     () => tabs.find(t => t.id === activeTabId) ?? null,
     [tabs, activeTabId]
@@ -1023,7 +1150,7 @@ function App() {
                       className="tab-close"
                       onClick={(e) => closeTab(tab.id, e)}
                     >
-                      ×
+                      ├ù
                     </button>
                   )}
                 </div>
@@ -1145,7 +1272,7 @@ function App() {
                   fontSize: '0.875rem',
                   fontWeight: 900,
                   cursor: 'pointer',
-                  color: '#f98006',
+                  color: '#D97A2B',
                   opacity: 0.7,
                   transition: 'opacity 0.2s, transform 0.1s',
                   boxShadow: '2px 2px 0 0 #1c140d'
@@ -1185,17 +1312,22 @@ function App() {
           {/* Action buttons */}
           <div className="actions">
             <div className="action-buttons">
-              <button className="action-btn" title="Copy" onClick={handleCopy} disabled={!activeTab || activeTab.selectedFiles.size === 0}>
+              <button className="action-btn" title="Copy (Ctrl+C)" onClick={handleCopy} disabled={!activeTab || activeTab.selectedFiles.size === 0}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z" />
                 </svg>
               </button>
-              <button className="action-btn" title="Paste" onClick={handlePaste} disabled={!clipboard}>
+              <button className="action-btn" title="Cut (Ctrl+X)" onClick={handleCut} disabled={!activeTab || activeTab.selectedFiles.size === 0}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M157.73,113.13A36,36,0,0,0,144,56a36,36,0,1,0-32,58.85L89.14,152H72a36,36,0,1,0,0,72h0a36,36,0,0,0,33.72-48.27L128,152.94l22.28,22.79A36,36,0,1,0,184,224h0a36,36,0,0,0,0-72H166.86Z" />
+                </svg>
+              </button>
+              <button className="action-btn" title="Paste (Ctrl+V)" onClick={handlePaste} disabled={!clipboard}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M168,152a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,152Zm-8-40H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm56-64V216a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V48A16,16,0,0,1,56,32H92.26a47.92,47.92,0,0,1,71.48,0H200A16,16,0,0,1,216,48Z" />
                 </svg>
               </button>
-              <button className="action-btn" title="Delete" onClick={handleDelete} disabled={!activeTab || activeTab.selectedFiles.size === 0}>
+              <button className="action-btn" title="Delete (Del)" onClick={handleDelete} disabled={!activeTab || activeTab.selectedFiles.size === 0}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16Z" />
                 </svg>
@@ -1203,6 +1335,11 @@ function App() {
               <button className="action-btn" title="New Folder" onClick={() => setShowNewFolderDialog(true)}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm-88,88a8,8,0,0,1,8,8v16h16a8,8,0,0,1,0,16H136v16a8,8,0,0,1-16,0V152H104a8,8,0,0,1,0-16h16V120A8,8,0,0,1,128,112Z" />
+                </svg>
+              </button>
+              <button className="action-btn" title="Create Archive" onClick={handleCreateArchive} disabled={!activeTab || activeTab.selectedFiles.size === 0}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Zm-40-64a8,8,0,0,1-8,8H136v16a8,8,0,0,1-16,0V160H104a8,8,0,0,1,0-16h16V128a8,8,0,0,1,16,0v16h16A8,8,0,0,1,160,152Z"/>
                 </svg>
               </button>
             </div>
@@ -1261,26 +1398,135 @@ function App() {
       </div>
 
       {/* Context Menu */}
-      {contextMenu && (
+      {contextMenu && contextMenu.target === 'file' && contextMenu.file && (
         <div
           ref={contextMenuRef}
           className="context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <div className="context-menu-item" onClick={() => openExtractDialog(contextMenu.file)}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
-              <path d="M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.94,51.2a16.14,16.14,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64Z" />
-            </svg>
-            Extract Here
-          </div>
+          {/* Open action for folders */}
+          {contextMenu.file.is_directory && (
+            <div className="context-menu-item" onClick={() => {
+              loadDirectory(contextMenu.file!.path);
+              setContextMenu(null);
+            }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
+                <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Z" />
+              </svg>
+              Open
+            </div>
+          )}
+
+          {/* Extract actions for archives */}
+          {contextMenu.file.is_archive && (
+            <>
+              <div className="context-menu-item" onClick={() => openExtractDialog(contextMenu.file!)}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.94,51.2a16.14,16.14,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64Z" />
+                </svg>
+                Extract Here
+              </div>
+              <div className="context-menu-item" onClick={() => {
+                setExtractPath(activeTab?.path || "");
+                openExtractDialog(contextMenu.file!);
+              }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Z" />
+                </svg>
+                Extract To...
+              </div>
+              <div className="context-menu-divider" />
+            </>
+          )}
+
+          {/* Create archive action for non-archives */}
+          {!contextMenu.file.is_archive && (
+            <div className="context-menu-item" onClick={() => {
+              setTabs(prevTabs =>
+                prevTabs.map(tab =>
+                  tab.id === activeTabId
+                    ? { ...tab, selectedFiles: new Set([contextMenu.file!.path]), lastSelectedFile: contextMenu.file!.path }
+                    : tab
+                )
+              );
+              handleCreateArchive();
+              setContextMenu(null);
+            }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
+                <path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Z"/>
+              </svg>
+              Add to Archive...
+            </div>
+          )}
+
+          {/* Copy */}
           <div className="context-menu-item" onClick={() => {
-            setExtractPath(activeTab?.path || "");
-            openExtractDialog(contextMenu.file);
+            setTabs(prevTabs =>
+              prevTabs.map(tab =>
+                tab.id === activeTabId
+                  ? { ...tab, selectedFiles: new Set([contextMenu.file!.path]), lastSelectedFile: contextMenu.file!.path }
+                  : tab
+              )
+            );
+            setClipboard({ files: [contextMenu.file!.path], operation: 'copy' });
+            setContextMenu(null);
           }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
-              <path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Z" />
+              <path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z" />
             </svg>
-            Extract To...
+            Copy
+          </div>
+
+          {/* Cut */}
+          <div className="context-menu-item" onClick={() => {
+            setTabs(prevTabs =>
+              prevTabs.map(tab =>
+                tab.id === activeTabId
+                  ? { ...tab, selectedFiles: new Set([contextMenu.file!.path]), lastSelectedFile: contextMenu.file!.path }
+                  : tab
+              )
+            );
+            setClipboard({ files: [contextMenu.file!.path], operation: 'cut' });
+            setContextMenu(null);
+          }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
+              <path d="M157.73,113.13A36,36,0,0,0,144,56a36,36,0,1,0-32,58.85L89.14,152H72a36,36,0,1,0,0,72h0a36,36,0,0,0,33.72-48.27L128,152.94l22.28,22.79A36,36,0,1,0,184,224h0a36,36,0,0,0,0-72H166.86ZM128,128a8,8,0,0,1-5.66-2.34l-8-8a8,8,0,0,1,0-11.32l24-24a8,8,0,0,1,11.32,11.32L128,115.31l-5.66-5.65a8,8,0,0,1,11.32-11.32l8,8a8,8,0,0,1,0,11.32l-8,8A8,8,0,0,1,128,128Z" />
+            </svg>
+            Cut
+          </div>
+
+          <div className="context-menu-divider" />
+
+          {/* Rename */}
+          <div className="context-menu-item" onClick={() => openRenameDialog(contextMenu.file!)}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
+              <path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31l123.31-123.32A16,16,0,0,0,227.32,73.37ZM92.69,208H48V163.31l88-88L180.69,120Z"/>
+            </svg>
+            Rename
+          </div>
+
+          {/* Delete */}
+          <div className="context-menu-item context-menu-item-danger" onClick={() => {
+            const performDelete = async () => {
+              try {
+                await invoke("delete_file", { filePath: contextMenu.file!.path });
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab) loadDirectory(activeTab.path);
+              } catch (error) {
+                showAlert(`Failed to delete: ${error}`);
+              }
+            };
+            if (settings.behavior.confirmDelete) {
+              showConfirm(`Delete "${contextMenu.file!.name}"?`, performDelete);
+            } else {
+              performDelete();
+            }
+            setContextMenu(null);
+          }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256">
+              <path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16Z" />
+            </svg>
+            Delete
           </div>
         </div>
       )}
@@ -1410,6 +1656,93 @@ function App() {
         </div>
       )}
 
+      {/* Create Archive Dialog */}
+      {showCreateArchiveDialog && (
+        <div className="dialog-overlay">
+          <div className="dialog">
+            <div className="dialog-header">
+              <h2 className="dialog-title">Create Archive</h2>
+            </div>
+            <div className="dialog-body">
+              <div className="dialog-field">
+                <label className="dialog-label">Archive Name:</label>
+                <input
+                  type="text"
+                  className="dialog-input"
+                  value={archiveName}
+                  onChange={(e) => setArchiveName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmCreateArchive()}
+                  placeholder="archive.7z"
+                  autoFocus
+                />
+              </div>
+              <p style={{ fontSize: '0.875rem', color: '#6C5F4E', marginTop: '0.5rem' }}>
+                Archive will be created in the current directory.
+              </p>
+            </div>
+            <div className="dialog-actions">
+              <button
+                className="dialog-btn dialog-btn-secondary"
+                onClick={() => {
+                  setShowCreateArchiveDialog(false);
+                  setArchiveName("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="dialog-btn dialog-btn-primary"
+                onClick={confirmCreateArchive}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Dialog */}
+      {showRenameDialog && renamingFile && (
+        <div className="dialog-overlay">
+          <div className="dialog">
+            <div className="dialog-header">
+              <h2 className="dialog-title">Rename</h2>
+            </div>
+            <div className="dialog-body">
+              <div className="dialog-field">
+                <label className="dialog-label">New Name:</label>
+                <input
+                  type="text"
+                  className="dialog-input"
+                  value={renameFileName}
+                  onChange={(e) => setRenameFileName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="dialog-actions">
+              <button
+                className="dialog-btn dialog-btn-secondary"
+                onClick={() => {
+                  setShowRenameDialog(false);
+                  setRenamingFile(null);
+                  setRenameFileName("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="dialog-btn dialog-btn-primary"
+                onClick={handleRename}
+              >
+                Rename
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirm Dialog */}
       {showConfirmDialog && (
         <div className="dialog-overlay">
@@ -1495,3 +1828,4 @@ function getFolderIcon(name: string) {
 }
 
 export default App;
+

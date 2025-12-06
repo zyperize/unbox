@@ -34,7 +34,8 @@ export interface TabData {
 export interface ContextMenu {
   x: number;
   y: number;
-  file: FileEntry;
+  target: 'file' | 'empty';
+  file?: FileEntry | null;
 }
 
 // Settings types

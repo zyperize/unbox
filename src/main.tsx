@@ -1,12 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
+import { Setup } from "./setup/Setup";
 import { SettingsProvider } from "./contexts/SettingsContext";
+import { ScanProvider } from "./contexts/ScanContext";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <SettingsProvider>
-      <App />
+      <ScanProvider>
+        <Setup />
+      </ScanProvider>
     </SettingsProvider>
   </React.StrictMode>,
 );

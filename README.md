@@ -18,7 +18,7 @@ A modern desktop file manager and archive tool built with Rust and React, featur
 
 ### UI Design
 - Clean, modern interface inspired by the UNBOX template design
-- Warm color palette with #fcfaf8 background and #f98006 accents
+- Warm color palette with #F3EDDF background and #D97A2B accents
 - **Thicker table borders** for better visual separation in the file list
 - Space Grotesk font for modern typography
 - Responsive design that adapts to different window sizes
@@ -122,11 +122,11 @@ unbox-7zip/
 ## Color Scheme
 
 The application uses a warm, professional color palette:
-- Background: `#fcfaf8` (warm white)
-- Primary accent: `#f98006` (warm orange)
-- Secondary text: `#9e7347` (muted brown)
-- Primary text: `#1c140d` (dark brown)
-- Borders: `#e9dbce` (light tan)
+- Background: `#F3EDDF` (warm beige)
+- Primary accent: `#D97A2B` (warm orange)
+- Secondary text: `#6C5F4E` (muted olive)
+- Primary text: `#2B2A28` (espresso)
+- Borders: `#E9E1CF` (soft surface)
 
 ## Recommended IDE Setup
 
@@ -142,3 +142,4 @@ This project incorporates 7-Zip compression technology. The 7-Zip reference repo
 - File operations are sandboxed to the user's home directory for security
 - The React frontend communicates with the Rust backend via Tauri's IPC system
 - All file paths are handled securely through Tauri's file system API
+- On Windows the backend requests the `SeBackupPrivilege` right at startup so MFT scans work out of the box. If the privilege is not granted to the user account, the app falls back gracefully and prints a warning instructing how to enable the local security policy.

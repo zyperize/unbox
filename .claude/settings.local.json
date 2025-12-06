@@ -39,7 +39,17 @@
       "Bash(powershell:*)",
       "Read(//c/Users/marcj/**)",
       "Bash(npx @tauri-apps/cli icon:*)",
-      "Bash(npm run tauri:dev:*)"
+      "Bash(npm run tauri:dev:*)",
+      "Bash(npm run dev:*)",
+      "Bash(Out-Null)",
+      "Bash(Select-String -Pattern \".\")",
+      "Bash(git log:*)",
+      "Bash(dir:*)",
+      "Bash(tasklist:*)",
+      "Bash(cmd /c \"taskkill /F /IM unbox-7zip.exe 2>nul & taskkill /F /IM node.exe 2>nul & echo Done\")",
+      "Bash(Select-String -Pattern \"error\" -Context 2)",
+      "Bash(grep:*)",
+      "Bash(git -C \"c:\\Users\\marcj\\space\" log --oneline)"
     ],
     "deny": [],
     "ask": []

@@ -36,6 +36,8 @@ export const FileRow = memo(function FileRow({
   };
 
   const handleContextMenu = (event: ReactMouseEvent<HTMLTableRowElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
     onContextMenu(file, event);
   };
 

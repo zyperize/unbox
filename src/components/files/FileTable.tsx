@@ -17,6 +17,7 @@ interface FileTableProps {
   onDragOver: (event: ReactDragEvent<HTMLElement>) => void;
   onDropOnFolder: (path: string, event: ReactDragEvent<HTMLElement>) => void;
   formatSize: (size: number) => string;
+  onEmptyContextMenu?: (event: ReactMouseEvent<HTMLDivElement>) => void;
 }
 
 const FileTableBase = forwardRef<HTMLDivElement, FileTableProps>(function FileTableBase(
@@ -34,9 +35,20 @@ const FileTableBase = forwardRef<HTMLDivElement, FileTableProps>(function FileTa
     onDragOver,
     onDropOnFolder,
     formatSize,
+    onEmptyContextMenu,
   },
   ref
 ) {
+  const handleContainerContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!onEmptyContextMenu) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('tr')) {
+      return;
+    }
+    event.preventDefault();
+    onEmptyContextMenu(event);
+  };
+
   const rows = useMemo(
     () =>
       files.map((file) => (
@@ -71,7 +83,7 @@ const FileTableBase = forwardRef<HTMLDivElement, FileTableProps>(function FileTa
   };
 
   return (
-    <div className="table-container" ref={ref}>
+    <div className="table-container" ref={ref} onContextMenu={handleContainerContextMenu}>
       <div className="table-wrapper">
         <table
           className="file-table"
