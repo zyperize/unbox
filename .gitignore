@@ -37,3 +37,7 @@ Thumbs.db
 # Test files
 test_scanner.ps1
 nul
+
+# Rust analyzer / build output and installer
+/target
+rustup-init.sh
